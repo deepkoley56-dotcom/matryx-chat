@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MATRYX CHAT</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="auth" class="screen">
+  <div class="card auth-card">
+    <div class="logo">M</div>
+    <h1>MATRYX CHAT</h1>
+    <p>Private real-time messaging demo</p>
+    <input id="username" placeholder="Username" maxlength="30">
+    <div class="row">
+      <button onclick="auth('login')">LOGIN</button>
+      <button class="ghost" onclick="auth('register')">REGISTER</button>
+    </div>
+    <small id="authMsg"></small>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <aside>
+    <div class="brand"><span class="dot"></span> MATRYX CHAT</div>
+    <div class="me" id="me"></div>
+    <button id="logoutBtn" type="button" onclick="logout()">LOGOUT</button>
+    <input id="search" placeholder="Search users..." oninput="renderUsers()">
+    <div id="users"></div>
+  </aside>
+
+  <main>
+    <header>
+      <div>
+        <b id="chatName">Select a user</b>
+        <span id="status"></span>
+      </div>
+      <div class="call-buttons">
+        <button onclick="startCall(false)" title="Voice call">📞</button>
+        <button onclick="startCall(true)" title="Video call">📹</button>
+      </div>
+    </header>
+
+    <section id="messages"></section>
+    <div id="typing"></div>
+
+    <form id="composer">
+      <label class="attach">＋<input id="file" type="file" accept="image/*,video/*,.pdf,.txt,.zip" hidden></label>
+      <input id="text" autocomplete="off" placeholder="Write a message...">
+      <button>SEND</button>
+    </form>
+  </main>
+</div>
+
+<div id="call" class="call hidden">
+  <div class="callbar"><b id="callTitle">Call</b><button onclick="endCall()">✕</button></div>
+  <div class="videos"><video id="remoteVideo" autoplay playsinline></video><video id="localVideo" autoplay muted playsinline></video></div>
+  <div class="call-actions"><button onclick="toggleMute()">🎙️</button><button onclick="endCall()">🔴 End</button></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
