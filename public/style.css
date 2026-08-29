@@ -2181,20 +2181,14 @@ header #typing{
     height:100dvh;
   }
 
-  aside{
-    height:auto;
-
-    max-height:185px;
-
-    padding:10px 11px 8px;
-
-    border-right:0;
-
-    border-bottom:1px solid #242428;
-
-    overflow:hidden;
-  }
-
+aside{
+  height:auto;
+  max-height:none;
+  padding:10px 11px 8px;
+  border-right:0;
+  border-bottom:1px solid #242428;
+  overflow:visible;
+}
   .sidebar-top{
     margin-bottom:8px;
   }
@@ -2269,16 +2263,17 @@ header #typing{
     margin-bottom:4px;
   }
 
-  #users{
-    display:flex;
-
-    gap:7px;
-
-    overflow-x:auto;
-    overflow-y:hidden;
-
-    padding:0 1px 3px;
-  }
+#users{
+  display:flex;
+  gap:7px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding:0 1px 5px;
+  min-height:58px;
+  width:100%;
+  box-sizing:border-box;
+  -webkit-overflow-scrolling:touch;
+}
 
   .user{
     flex:0 0 145px;
