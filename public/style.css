@@ -3478,7 +3478,7 @@ cat >> public/style.css <<'EOF'
 }
 cat >> public/style.css <<'EOF'
 
-/* =========================================================
+/* ========================================================
    MATRYX PREMIUM VERIFIED BADGE
 ========================================================= */
 
@@ -3544,3 +3544,49 @@ cat >> public/style.css <<'EOF'
   height:17px;
 }
 
+/* VERIFIED BADGE — WHITE TICK FIX */
+
+.matryx-verified{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+
+  width:18px !important;
+  height:18px !important;
+
+  margin-left:6px !important;
+  position:relative !important;
+  top:2px !important;
+
+  border-radius:50% !important;
+
+  background:#ff1717 !important;
+  color:#fff !important;
+
+  border:2px solid #050505 !important;
+
+  box-shadow:
+    0 0 8px rgba(255,23,23,.65),
+    0 0 16px rgba(255,23,23,.25) !important;
+}
+
+.matryx-verified::before{
+  content:"✓" !important;
+
+  display:block !important;
+
+  position:absolute !important;
+
+  left:50% !important;
+  top:50% !important;
+
+  transform:translate(-50%,-55%) !important;
+
+  color:#fff !important;
+
+  font-family:Arial,sans-serif !important;
+  font-size:11px !important;
+  font-weight:900 !important;
+
+  line-height:1 !important;
+}
