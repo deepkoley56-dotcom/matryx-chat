@@ -2554,3 +2554,399 @@ aside{
   }
 
 }
+
+/* =========================================================
+   MATRYX CHAT — PREMIUM WHATSAPP STYLE UI
+   UI ONLY — Backend / PostgreSQL untouched
+========================================================= */
+
+:root{
+  --mx-bg:#07100d;
+  --mx-panel:#0b1512;
+  --mx-panel2:#101c18;
+  --mx-border:rgba(255,255,255,.08);
+  --mx-text:#f4f7f5;
+  --mx-muted:#91a39c;
+  --mx-green:#20d36b;
+  --mx-green2:#16a85a;
+}
+
+/* Main application */
+#app{
+  background:
+    radial-gradient(circle at 15% 10%,rgba(32,211,107,.07),transparent 30%),
+    radial-gradient(circle at 85% 90%,rgba(32,211,107,.04),transparent 30%),
+    var(--mx-bg) !important;
+}
+
+/* Sidebar */
+aside{
+  background:
+    linear-gradient(180deg,#0b1512,#08100d) !important;
+  border-right:1px solid var(--mx-border) !important;
+}
+
+/* Brand */
+.brand{
+  transition:.25s ease;
+}
+
+.brand:hover{
+  transform:translateY(-1px);
+}
+
+.brand-name span{
+  color:var(--mx-green) !important;
+  text-shadow:0 0 18px rgba(32,211,107,.35);
+}
+
+/* Profile card */
+.profile-card{
+  background:linear-gradient(
+    145deg,
+    rgba(255,255,255,.055),
+    rgba(255,255,255,.018)
+  ) !important;
+
+  border:1px solid var(--mx-border) !important;
+  box-shadow:0 12px 35px rgba(0,0,0,.22);
+  transition:.25s ease;
+}
+
+.profile-card:hover{
+  border-color:rgba(32,211,107,.22) !important;
+}
+
+/* Avatar */
+.avatar,
+.chat-avatar{
+  box-shadow:
+    0 0 0 2px rgba(32,211,107,.10),
+    0 0 22px rgba(32,211,107,.08);
+}
+
+/* Search */
+.search-wrap{
+  position:relative;
+}
+
+#search{
+  background:#101b17 !important;
+  border:1px solid var(--mx-border) !important;
+  color:var(--mx-text) !important;
+  border-radius:14px !important;
+  transition:.25s ease;
+}
+
+#search:focus{
+  border-color:rgba(32,211,107,.42) !important;
+  box-shadow:0 0 0 3px rgba(32,211,107,.07);
+}
+
+/* Contact title */
+.section-title{
+  color:#a9b8b2 !important;
+}
+
+.section-title small{
+  color:var(--mx-green) !important;
+}
+
+/* Contact list */
+#users{
+  scrollbar-width:thin;
+  scrollbar-color:rgba(32,211,107,.25) transparent;
+}
+
+/* User cards */
+.user{
+  background:rgba(255,255,255,.025) !important;
+  border:1px solid transparent !important;
+  border-radius:14px !important;
+  transition:
+    background .2s ease,
+    border-color .2s ease,
+    transform .2s ease;
+}
+
+.user:hover{
+  background:rgba(32,211,107,.055) !important;
+  border-color:rgba(32,211,107,.12) !important;
+  transform:translateX(2px);
+}
+
+.user.active{
+  background:
+    linear-gradient(
+      90deg,
+      rgba(32,211,107,.13),
+      rgba(32,211,107,.035)
+    ) !important;
+
+  border-color:rgba(32,211,107,.20) !important;
+}
+
+.user small{
+  color:var(--mx-muted) !important;
+}
+
+.user .online.on{
+  background:var(--mx-green) !important;
+  box-shadow:0 0 9px rgba(32,211,107,.75);
+}
+
+/* Chat area */
+main{
+  background:
+    radial-gradient(
+      circle at 50% 0%,
+      rgba(32,211,107,.035),
+      transparent 38%
+    ),
+    #07100d !important;
+}
+
+/* Chat header */
+main header{
+  background:rgba(8,16,13,.92) !important;
+  backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--mx-border) !important;
+}
+
+.chat-user b{
+  color:var(--mx-text) !important;
+}
+
+#status{
+  color:var(--mx-green) !important;
+}
+
+/* Messages background */
+#messages{
+  background:
+    radial-gradient(
+      circle at 20% 20%,
+      rgba(32,211,107,.025),
+      transparent 25%
+    ),
+    radial-gradient(
+      circle at 80% 80%,
+      rgba(255,255,255,.018),
+      transparent 30%
+    ) !important;
+}
+
+/* Message bubbles */
+.bubble{
+  max-width:min(72%,520px);
+  background:#17231f !important;
+  border:1px solid rgba(255,255,255,.045);
+  border-radius:16px 16px 16px 5px !important;
+  box-shadow:0 5px 18px rgba(0,0,0,.18);
+  animation:mxMessageIn .22s ease;
+}
+
+.bubble.mine{
+  background:
+    linear-gradient(
+      135deg,
+      #0f6b3e,
+      #0d5935
+    ) !important;
+
+  border-color:rgba(32,211,107,.14);
+  border-radius:16px 16px 5px 16px !important;
+}
+
+.bubble .time{
+  color:rgba(255,255,255,.52) !important;
+}
+
+/* Image/video messages */
+.bubble img,
+.bubble video{
+  border-radius:12px !important;
+}
+
+/* Empty chat */
+.empty-chat{
+  opacity:.92;
+}
+
+.empty-logo{
+  background:
+    linear-gradient(
+      145deg,
+      #123b28,
+      #0b2017
+    ) !important;
+
+  color:var(--mx-green) !important;
+  border:1px solid rgba(32,211,107,.15);
+  box-shadow:0 0 35px rgba(32,211,107,.08);
+}
+
+/* Typing */
+#typing{
+  color:var(--mx-green) !important;
+}
+
+/* Composer */
+#composer{
+  background:rgba(8,16,13,.96) !important;
+  border-top:1px solid var(--mx-border) !important;
+  backdrop-filter:blur(15px);
+}
+
+#text{
+  background:#111d19 !important;
+  border:1px solid var(--mx-border) !important;
+  color:#fff !important;
+  border-radius:16px !important;
+  transition:.25s ease;
+}
+
+#text:focus{
+  border-color:rgba(32,211,107,.35) !important;
+  box-shadow:0 0 0 3px rgba(32,211,107,.06);
+}
+
+/* Buttons inside composer */
+#composer button{
+  transition:.2s ease;
+}
+
+#composer button:hover{
+  transform:translateY(-1px);
+}
+
+/* Call screen */
+#call{
+  background:
+    radial-gradient(
+      circle at 50% 35%,
+      rgba(32,211,107,.08),
+      transparent 35%
+    ),
+    #050806 !important;
+}
+
+#callTitle{
+  color:#fff !important;
+}
+
+.remote-placeholder{
+  background:#0b1512 !important;
+}
+
+/* Premium call controls */
+#call button{
+  transition:.2s ease;
+}
+
+#call button:hover{
+  transform:scale(1.05);
+}
+
+/* Scrollbars */
+*{
+  scrollbar-width:thin;
+  scrollbar-color:rgba(32,211,107,.22) transparent;
+}
+
+*::-webkit-scrollbar{
+  width:6px;
+  height:6px;
+}
+
+*::-webkit-scrollbar-track{
+  background:transparent;
+}
+
+*::-webkit-scrollbar-thumb{
+  background:rgba(32,211,107,.22);
+  border-radius:20px;
+}
+
+/* Mobile */
+@media(max-width:700px){
+
+  #app{
+    background:#07100d !important;
+  }
+
+  aside{
+    background:
+      linear-gradient(
+        180deg,
+        #0b1512,
+        #08100d
+      ) !important;
+  }
+
+  #users{
+    padding-bottom:7px !important;
+    gap:8px !important;
+  }
+
+  .user{
+    flex:0 0 150px !important;
+    min-height:58px;
+  }
+
+  .user:hover{
+    transform:none;
+  }
+
+  main header{
+    min-height:60px;
+  }
+
+  .bubble{
+    max-width:82%;
+  }
+
+  #composer{
+    padding-bottom:
+      max(8px,env(safe-area-inset-bottom));
+  }
+}
+
+/* Small phones */
+@media(max-width:380px){
+
+  .user{
+    flex-basis:138px !important;
+  }
+
+  .bubble{
+    max-width:88%;
+  }
+}
+
+/* Message animation */
+@keyframes mxMessageIn{
+  from{
+    opacity:0;
+    transform:translateY(5px) scale(.985);
+  }
+
+  to{
+    opacity:1;
+    transform:translateY(0) scale(1);
+  }
+}
+
+/* Premium subtle glow */
+@media(hover:hover){
+
+  .btn,
+  button,
+  .contact-btn{
+    transition:
+      transform .2s ease,
+      box-shadow .2s ease,
+      border-color .2s ease;
+  }
+}
+
