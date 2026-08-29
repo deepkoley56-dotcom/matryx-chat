@@ -1386,3 +1386,102 @@ header #typing{
   }
 
 }
+
+/* =========================================================
+   MOBILE LOGO + LOGOUT FIX
+========================================================= */
+
+@media(max-width:700px){
+
+  .sidebar-top{
+    position:relative;
+    min-height:40px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .sidebar-top .brand{
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    white-space:nowrap;
+  }
+
+  .sidebar-top .mini-logo{
+    width:30px;
+    height:30px;
+    min-width:30px;
+    border-radius:9px;
+  }
+
+  .sidebar-top .brand b{
+    font-size:11px;
+    letter-spacing:1.5px;
+  }
+
+  .sidebar-top .brand small{
+    font-size:6px;
+    letter-spacing:2px;
+  }
+
+  /* Logout always visible on mobile */
+  #logoutBtn{
+    position:absolute;
+    right:0;
+    top:50%;
+    transform:translateY(-50%);
+    display:grid !important;
+    place-items:center;
+    width:34px;
+    height:34px;
+    min-width:34px;
+    padding:0;
+    border-radius:10px;
+    font-size:17px;
+    z-index:5;
+  }
+
+  #logoutBtn:hover{
+    transform:translateY(-50%);
+  }
+
+}
+
+
+/* VERY SMALL PHONES */
+
+@media(max-width:380px){
+
+  .sidebar-top{
+    min-height:38px;
+  }
+
+  .sidebar-top .mini-logo{
+    width:27px;
+    height:27px;
+    min-width:27px;
+    border-radius:8px;
+  }
+
+  .sidebar-top .brand b{
+    font-size:10px;
+  }
+
+  .sidebar-top .brand small{
+    display:none;
+  }
+
+  #logoutBtn{
+    width:32px;
+    height:32px;
+    min-width:32px;
+    font-size:16px;
+  }
+
+}
