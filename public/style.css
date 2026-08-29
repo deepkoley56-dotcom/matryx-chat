@@ -1505,92 +1505,34 @@ header #typing{
 cd ~/matryx-chat-persistent
 cat >> public/style.css <<'EOF'
 
-/* =========================================================
-   PROFILE ACTION BUTTONS — DESKTOP + MOBILE FIX
-========================================================= */
-
 .profile-card{
-  position:relative !important;
   display:flex !important;
   align-items:center !important;
-  gap:8px !important;
+  gap:7px !important;
 }
 
 .profile-info{
-  flex:1 1 auto !important;
+  flex:1 !important;
   min-width:0 !important;
-  max-width:calc(100% - 105px) !important;
 }
 
 #editProfileBtn,
 #logoutBtn{
-  position:static !important;
-  flex:0 0 32px !important;
-  width:32px !important;
-  height:32px !important;
-  min-width:32px !important;
-  min-height:32px !important;
-  margin:0 !important;
-  padding:0 !important;
   display:grid !important;
   place-items:center !important;
+  flex:0 0 30px !important;
+  width:30px !important;
+  height:30px !important;
+  min-width:30px !important;
+  min-height:30px !important;
+  padding:0 !important;
+  margin:0 !important;
+  position:static !important;
   visibility:visible !important;
   opacity:1 !important;
-  position:relative !important;
-  z-index:50 !important;
-  cursor:pointer !important;
 }
 
-#editProfileBtn{
-  color:#bbb !important;
-  background:#121216 !important;
-  border:1px solid #2b2b30 !important;
-  border-radius:10px !important;
-}
-
-#logoutBtn{
-  color:#bbb !important;
-  background:#121216 !important;
-  border:1px solid #2b2b30 !important;
-  border-radius:10px !important;
-}
-
-#editProfileBtn:hover,
-#logoutBtn:hover{
-  color:#fff !important;
-  border-color:#c51a2a !important;
-  background:#1b0b0e !important;
-}
-
-/* MOBILE */
-@media (max-width:700px){
-  .profile-card{
-    padding:8px !important;
-    gap:6px !important;
-  }
-
-  .profile-info{
-    max-width:calc(100% - 82px) !important;
-  }
-
-  #editProfileBtn,
-  #logoutBtn{
-    flex:0 0 29px !important;
-    width:29px !important;
-    height:29px !important;
-    min-width:29px !important;
-    min-height:29px !important;
-    font-size:14px !important;
-  }
-}
-
-/* VERY SMALL PHONES */
-@media (max-width:380px){
-  .profile-card{
-    gap:5px !important;
-    padding:7px !important;
-  }
-
+@media(max-width:700px){
   #editProfileBtn,
   #logoutBtn{
     flex-basis:27px !important;
@@ -1598,8 +1540,7 @@ cat >> public/style.css <<'EOF'
     height:27px !important;
     min-width:27px !important;
     min-height:27px !important;
-    font-size:13px !important;
+    font-size:14px !important;
   }
 }
-
 EOF
