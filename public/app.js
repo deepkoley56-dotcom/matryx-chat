@@ -1,11 +1,16 @@
 /* =========================================================
    MATRYX CHAT - APP.JS
-   Permanent User ID + Safe Account Persistence
-   Username + Profile + Chat + Calls
+   PostgreSQL Users + Mobile Sync Fix
+   Existing Chat + Profile + Calls Preserved
 ========================================================= */
 
-const socket = io();
-
+const socket = io({
+  transports: ["websocket", "polling"],
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000
+});
 
 /* =========================
    STATE
@@ -21,223 +26,113 @@ let currentCallUser = null;
 let currentCallVideo = false;
 let isMuted = false;
 
+let usersLoading = false;
+let usersLoadTimer = null;
+
 const onlineUsers = new Set();
 
 const rtcConfig = {
   iceServers: [
-    {
-      urls:
-        "stun:stun.l.google.com:19302"
-    },
-    {
-      urls:
-        "stun:stun1.l.google.com:19302"
-    }
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" }
   ]
 };
-
-
 /* =========================
    ELEMENTS
 ========================= */
 
-const authScreen =
-  document.getElementById("auth");
+const authScreen = document.getElementById("auth");
+const appScreen = document.getElementById("app");
 
-const appScreen =
-  document.getElementById("app");
+const phoneInput = document.getElementById("phone");
+const passwordInput = document.getElementById("password");
+const authMsg = document.getElementById("authMsg");
 
-const phoneInput =
-  document.getElementById("phone");
+const meEl = document.getElementById("me");
+const myAvatar = document.getElementById("myAvatar");
 
-const passwordInput =
-  document.getElementById("password");
+const usersEl = document.getElementById("users");
+const searchInput = document.getElementById("search");
+const contactCount = document.getElementById("contactCount");
 
-const authMsg =
-  document.getElementById("authMsg");
+const chatName = document.getElementById("chatName");
+const chatAvatar = document.getElementById("chatAvatar");
+const statusEl = document.getElementById("status");
+const typingEl = document.getElementById("typing");
 
-const meEl =
-  document.getElementById("me");
+const messagesEl = document.getElementById("messages");
+const composer = document.getElementById("composer");
+const textInput = document.getElementById("text");
+const fileInput = document.getElementById("file");
 
-const myAvatar =
-  document.getElementById("myAvatar");
-
-const usersEl =
-  document.getElementById("users");
-
-const searchInput =
-  document.getElementById("search");
-
-const contactCount =
-  document.getElementById("contactCount");
-
-const chatName =
-  document.getElementById("chatName");
-
-const chatAvatar =
-  document.getElementById("chatAvatar");
-
-const statusEl =
-  document.getElementById("status");
-
-const typingEl =
-  document.getElementById("typing");
-
-const messagesEl =
-  document.getElementById("messages");
-
-const composer =
-  document.getElementById("composer");
-
-const textInput =
-  document.getElementById("text");
-
-const fileInput =
-  document.getElementById("file");
-
-const callScreen =
-  document.getElementById("call");
-
-const callTitle =
-  document.getElementById("callTitle");
-
-const remoteVideo =
-  document.getElementById("remoteVideo");
-
-const localVideo =
-  document.getElementById("localVideo");
-
+const callScreen = document.getElementById("call");
+const callTitle = document.getElementById("callTitle");
+const remoteVideo = document.getElementById("remoteVideo");
+const localVideo = document.getElementById("localVideo");
 
 /* =========================
    STORAGE
 ========================= */
 
 function saveMe() {
-
-  if (
-    !me ||
-    !me.id
-  ) {
-    return;
+  if (me) {
+    localStorage.setItem(
+      "matryx_me",
+      JSON.stringify(me)
+    );
   }
-
-  /*
-    The server-created ID is saved
-    locally.
-
-    It is never regenerated here.
-  */
-
-  localStorage.setItem(
-    "matryx_me",
-    JSON.stringify(me)
-  );
 }
 
-
 function loadMe() {
-
   try {
-
-    const saved =
-      JSON.parse(
-        localStorage.getItem(
-          "matryx_me"
-        ) || "null"
-      );
+    const saved = JSON.parse(
+      localStorage.getItem("matryx_me") || "null"
+    );
 
     if (
       saved &&
       saved.id &&
-      saved.username &&
-      saved.phone
+      saved.username
     ) {
-
       me = saved;
-
       return true;
     }
-
-  } catch (error) {
-
-    console.error(
-      "LOCAL ACCOUNT LOAD ERROR:",
-      error
-    );
-  }
+  } catch {}
 
   return false;
 }
 
-
 function clearMe() {
-
-  /*
-    Logout removes only the local
-    login state.
-
-    It does NOT delete the server
-    account.
-  */
-
-  localStorage.removeItem(
-    "matryx_me"
-  );
-
+  localStorage.removeItem("matryx_me");
   me = null;
 }
-
 
 /* =========================
    AUTH UI
 ========================= */
 
 function showAuth() {
-
-  if (authScreen) {
-    authScreen.classList.remove(
-      "hidden"
-    );
-  }
-
-  if (appScreen) {
-    appScreen.classList.add(
-      "hidden"
-    );
-  }
+  authScreen?.classList.remove("hidden");
+  appScreen?.classList.add("hidden");
 }
-
 
 function showApp() {
-
-  if (authScreen) {
-    authScreen.classList.add(
-      "hidden"
-    );
-  }
-
-  if (appScreen) {
-    appScreen.classList.remove(
-      "hidden"
-    );
-  }
+  authScreen?.classList.add("hidden");
+  appScreen?.classList.remove("hidden");
 
   updateProfileUI();
-
   renderUsers();
 
-  if (me?.id) {
+  if (me) {
+    socket.emit("join", me);
 
-    socket.emit(
-      "join",
-      {
-        id:
-          me.id
-      }
-    );
+    /*
+     * IMPORTANT:
+     * Always fetch latest users after login.
+     */
+    loadUsers(true);
   }
 }
-
 
 /* =========================
    AUTH
@@ -245,10 +140,7 @@ function showApp() {
 
 async function auth(type) {
 
-  if (
-    !phoneInput ||
-    !passwordInput
-  ) {
+  if (!phoneInput || !passwordInput) {
     return;
   }
 
@@ -258,15 +150,10 @@ async function auth(type) {
   const password =
     passwordInput.value;
 
-  if (
-    !phone ||
-    !password
-  ) {
-
+  if (!phone || !password) {
     setAuthMessage(
       "Phone number and password are required."
     );
-
     return;
   }
 
@@ -278,77 +165,36 @@ async function auth(type) {
 
   try {
 
-    const response =
-      await fetch(
-        type === "login"
-          ? "/api/login"
-          : "/api/register",
-        {
-          method:
-            "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-
-          body:
-            JSON.stringify({
-              phone,
-              password
-            })
-        }
-      );
+    const response = await fetch(
+      type === "login"
+        ? "/api/login"
+        : "/api/register",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+        cache: "no-store",
+        body: JSON.stringify({
+          phone,
+          password
+        })
+      }
+    );
 
     const data =
       await response.json();
 
     if (!response.ok) {
-
       setAuthMessage(
         data.error ||
         "Something went wrong."
       );
-
       return;
     }
 
-    /*
-      IMPORTANT:
-
-      Always replace local account data
-      with the server response.
-
-      The ID returned by server is the
-      permanent User ID.
-    */
-
-    if (
-      !data.id ||
-      !data.username ||
-      !data.phone
-    ) {
-
-      setAuthMessage(
-        "Invalid account data received from server."
-      );
-
-      return;
-    }
-
-    me = {
-      id:
-        data.id,
-
-      username:
-        data.username,
-
-      phone:
-        data.phone,
-
-      avatar:
-        data.avatar || null
-    };
+    me = data;
 
     saveMe();
 
@@ -356,7 +202,13 @@ async function auth(type) {
 
     showApp();
 
-    await loadUsers();
+    /*
+     * Extra refresh after successful auth.
+     */
+    setTimeout(
+      () => loadUsers(true),
+      300
+    );
 
   } catch (error) {
 
@@ -371,18 +223,12 @@ async function auth(type) {
   }
 }
 
-
-function setAuthMessage(
-  message
-) {
-
+function setAuthMessage(message) {
   if (authMsg) {
-
     authMsg.textContent =
       message || "";
   }
 }
-
 
 /* =========================
    LOGOUT
@@ -392,22 +238,13 @@ function logout() {
 
   endCall();
 
-  /*
-    Only local session is removed.
-
-    Server account remains permanently
-    stored in database.
-  */
-
   clearMe();
 
-  selectedUser =
-    null;
-
+  selectedUser = null;
+  users = [];
   onlineUsers.clear();
 
   if (messagesEl) {
-
     messagesEl.innerHTML = `
       <div class="empty-chat">
         <div class="empty-logo">M</div>
@@ -417,9 +254,12 @@ function logout() {
     `;
   }
 
+  if (usersEl) {
+    usersEl.innerHTML = "";
+  }
+
   showAuth();
 }
-
 
 /* =========================
    PROFILE UI
@@ -427,18 +267,11 @@ function logout() {
 
 function updateProfileUI() {
 
-  if (!me) {
-    return;
-  }
+  if (!me) return;
 
   if (meEl) {
-
     meEl.textContent =
-      "@" +
-      (
-        me.username ||
-        "user"
-      );
+      "@" + me.username;
   }
 
   updateAvatarElement(
@@ -448,16 +281,13 @@ function updateProfileUI() {
   );
 }
 
-
 function updateAvatarElement(
   element,
   username,
   avatar
 ) {
 
-  if (!element) {
-    return;
-  }
+  if (!element) return;
 
   if (avatar) {
 
@@ -470,8 +300,7 @@ function updateAvatarElement(
     element.style.backgroundPosition =
       "center";
 
-    element.textContent =
-      "";
+    element.textContent = "";
 
   } else {
 
@@ -479,14 +308,11 @@ function updateAvatarElement(
       "";
 
     element.textContent =
-      String(
-        username || "M"
-      )
+      String(username || "M")
         .charAt(0)
         .toUpperCase();
   }
 }
-
 
 /* =========================
    USERNAME EDIT
@@ -494,9 +320,7 @@ function updateAvatarElement(
 
 async function editUsername() {
 
-  if (!me?.id) {
-    return;
-  }
+  if (!me) return;
 
   const current =
     me.username || "";
@@ -507,77 +331,46 @@ async function editUsername() {
       current
     );
 
-  if (
-    newName === null
-  ) {
-    return;
-  }
+  if (newName === null) return;
 
   const username =
     newName.trim();
 
   if (!username) {
-
-    alert(
-      "Name cannot be empty."
-    );
-
+    alert("Name cannot be empty.");
     return;
   }
 
-  if (
-    username.length < 2
-  ) {
-
+  if (username.length < 2) {
     alert(
       "Name must be at least 2 characters."
     );
-
     return;
   }
 
-  if (
-    username.length > 30
-  ) {
-
+  if (username.length > 30) {
     alert(
       "Name must be 30 characters or less."
     );
-
     return;
   }
 
   await updateUsernameDirect(
-    username
+    username,
+    true
   );
 }
-
 
 /* =========================
    PROFILE PHOTO
 ========================= */
 
-async function uploadAvatar(
-  file
-) {
+async function uploadAvatar(file) {
 
-  if (
-    !me?.id ||
-    !file
-  ) {
-    return;
-  }
+  if (!me || !file) return;
 
-  if (
-    !file.type.startsWith(
-      "image/"
-    )
-  ) {
-
-    alert(
-      "Please select an image."
-    );
-
+  if (!file.type.startsWith("image/")) {
+    alert("Please select an image.");
     return;
   }
 
@@ -588,10 +381,6 @@ async function uploadAvatar(
     "avatar",
     file
   );
-
-  /*
-    Permanent User ID is sent.
-  */
 
   formData.append(
     "id",
@@ -604,11 +393,9 @@ async function uploadAvatar(
       await fetch(
         "/api/profile/avatar",
         {
-          method:
-            "POST",
-
-          body:
-            formData
+          method: "POST",
+          cache: "no-store",
+          body: formData
         }
       );
 
@@ -616,41 +403,25 @@ async function uploadAvatar(
       await response.json();
 
     if (!response.ok) {
-
       alert(
         data.error ||
         "Profile photo upload failed."
       );
-
       return;
     }
 
-    if (
-      data.user?.id !== me.id
-    ) {
-
-      alert(
-        "Server returned an invalid User ID."
-      );
-
-      return;
-    }
-
-    /*
-      Keep the same permanent ID.
-    */
-
-    me = {
-      ...me,
-      ...data.user,
-      id: me.id
-    };
+    me =
+      data.user || {
+        ...me,
+        avatar:
+          data.avatar
+      };
 
     saveMe();
 
     updateProfileUI();
 
-    renderUsers();
+    await loadUsers(true);
 
     updateSelectedUser();
 
@@ -667,41 +438,84 @@ async function uploadAvatar(
   }
 }
 
-
 /* =========================
-   USERS
+   USERS - IMPORTANT FIX
 ========================= */
 
-async function loadUsers() {
+async function loadUsers(force = false) {
+
+  if (!me) {
+    return;
+  }
+
+  if (usersLoading) {
+    return;
+  }
+
+  usersLoading = true;
 
   try {
 
     const response =
       await fetch(
-        "/api/users"
+        `/api/users?_=${Date.now()}`,
+        {
+          method: "GET",
+
+          cache: "no-store",
+
+          headers: {
+            "Cache-Control":
+              "no-cache",
+            "Pragma":
+              "no-cache"
+          }
+        }
       );
 
     if (!response.ok) {
-      return false;
+      throw new Error(
+        `Users request failed: ${response.status}`
+      );
     }
 
-    const list =
+    const data =
       await response.json();
 
-    if (
-      !Array.isArray(list)
-    ) {
-      return false;
+    if (!Array.isArray(data)) {
+      throw new Error(
+        "Invalid users response."
+      );
     }
 
-    users =
-      list;
+    /*
+     * Replace local list with the latest
+     * PostgreSQL-backed server list.
+     */
+    users = data;
+
+    /*
+     * If currently selected user exists,
+     * replace it with the newest version.
+     */
+    if (selectedUser) {
+
+      const freshSelected =
+        users.find(
+          user =>
+            user.id ===
+            selectedUser.id
+        );
+
+      if (freshSelected) {
+        selectedUser =
+          freshSelected;
+      }
+    }
 
     renderUsers();
 
     updateSelectedUser();
-
-    return true;
 
   } catch (error) {
 
@@ -710,16 +524,41 @@ async function loadUsers() {
       error
     );
 
-    return false;
+  } finally {
+
+    usersLoading = false;
   }
 }
 
+/*
+ * Repeated safe refresh.
+ * Useful when a phone reconnects after
+ * network changes or Render wakes up.
+ */
+function scheduleUsersRefresh() {
+
+  clearTimeout(
+    usersLoadTimer
+  );
+
+  usersLoadTimer =
+    setTimeout(
+      () => {
+        if (me) {
+          loadUsers(true);
+        }
+      },
+      500
+    );
+}
+
+/* =========================
+   RENDER USERS
+========================= */
 
 function renderUsers() {
 
-  if (!usersEl) {
-    return;
-  }
+  if (!usersEl) return;
 
   const query =
     searchInput
@@ -729,39 +568,33 @@ function renderUsers() {
       : "";
 
   const filtered =
-    users.filter(
-      user => {
+    users.filter(user => {
 
-        if (!me) {
-          return false;
-        }
+      if (!me) return false;
 
-        if (
-          user.id === me.id
-        ) {
-          return false;
-        }
-
-        if (!query) {
-          return true;
-        }
-
-        return String(
-          user.username || ""
-        )
-          .toLowerCase()
-          .includes(query);
+      if (
+        user.id === me.id
+      ) {
+        return false;
       }
-    );
+
+      if (!query) {
+        return true;
+      }
+
+      return String(
+        user.username || ""
+      )
+        .toLowerCase()
+        .includes(query);
+    });
 
   if (contactCount) {
-
     contactCount.textContent =
       filtered.length;
   }
 
-  usersEl.innerHTML =
-    "";
+  usersEl.innerHTML = "";
 
   if (!filtered.length) {
 
@@ -791,7 +624,8 @@ function renderUsers() {
         "user" +
         (
           selectedUser &&
-          selectedUser.id === user.id
+          selectedUser.id ===
+            user.id
             ? " active"
             : ""
         );
@@ -809,9 +643,7 @@ function renderUsers() {
       `;
 
       const nameElement =
-        item.querySelector(
-          "b"
-        );
+        item.querySelector("b");
 
       nameElement.textContent =
         user.username ||
@@ -827,7 +659,6 @@ function renderUsers() {
           user.id
         )
       ) {
-
         onlineDot.classList.add(
           "on"
         );
@@ -835,8 +666,7 @@ function renderUsers() {
 
       item.addEventListener(
         "click",
-        () =>
-          selectUser(user)
+        () => selectUser(user)
       );
 
       usersEl.appendChild(
@@ -845,7 +675,6 @@ function renderUsers() {
     }
   );
 }
-
 
 /* =========================
    ONLINE USERS
@@ -860,24 +689,19 @@ socket.on(
     }
 
     if (data.online) {
-
       onlineUsers.add(
         data.userId
       );
-
     } else {
-
       onlineUsers.delete(
         data.userId
       );
     }
 
     renderUsers();
-
     updateSelectedUser();
   }
 );
-
 
 /* =========================
    PROFILE SOCKET UPDATE
@@ -899,9 +723,16 @@ socket.on(
       );
 
     if (index !== -1) {
-
       users[index] =
         updated;
+    } else {
+      /*
+       * Important:
+       * If a newly received user/profile
+       * isn't in the local list, refresh
+       * the complete list.
+       */
+      loadUsers(true);
     }
 
     if (
@@ -909,15 +740,7 @@ socket.on(
       updated.id === me.id
     ) {
 
-      /*
-        ID stays exactly the same.
-      */
-
-      me = {
-        ...me,
-        ...updated,
-        id: me.id
-      };
+      me = updated;
 
       saveMe();
 
@@ -940,19 +763,13 @@ socket.on(
   }
 );
 
-
 /* =========================
    SELECT USER
 ========================= */
 
-async function selectUser(
-  user
-) {
+async function selectUser(user) {
 
-  if (
-    !user ||
-    !me?.id
-  ) {
+  if (!user || !me) {
     return;
   }
 
@@ -966,7 +783,6 @@ async function selectUser(
   await loadMessages();
 }
 
-
 function updateSelectedUser() {
 
   if (!selectedUser) {
@@ -974,7 +790,6 @@ function updateSelectedUser() {
   }
 
   if (chatName) {
-
     chatName.textContent =
       selectedUser.username ||
       "User";
@@ -997,7 +812,6 @@ function updateSelectedUser() {
   }
 }
 
-
 /* =========================
    MESSAGES
 ========================= */
@@ -1005,8 +819,8 @@ function updateSelectedUser() {
 async function loadMessages() {
 
   if (
-    !me?.id ||
-    !selectedUser?.id ||
+    !me ||
+    !selectedUser ||
     !messagesEl
   ) {
     return;
@@ -1020,7 +834,11 @@ async function loadMessages() {
           me.id
         )}/${encodeURIComponent(
           selectedUser.id
-        )}`
+        )}?_=${Date.now()}`,
+        {
+          cache:
+            "no-store"
+        }
       );
 
     if (!response.ok) {
@@ -1030,14 +848,10 @@ async function loadMessages() {
     const messages =
       await response.json();
 
-    if (
-      !Array.isArray(messages)
-    ) {
-      return;
-    }
-
     renderMessages(
-      messages
+      Array.isArray(messages)
+        ? messages
+        : []
     );
 
   } catch (error) {
@@ -1049,17 +863,11 @@ async function loadMessages() {
   }
 }
 
+function renderMessages(messages) {
 
-function renderMessages(
-  messages
-) {
+  if (!messagesEl) return;
 
-  if (!messagesEl) {
-    return;
-  }
-
-  messagesEl.innerHTML =
-    "";
+  messagesEl.innerHTML = "";
 
   if (!messages.length) {
 
@@ -1081,10 +889,7 @@ function renderMessages(
   scrollMessages();
 }
 
-
-function renderMessage(
-  message
-) {
+function renderMessage(message) {
 
   if (
     !messagesEl ||
@@ -1102,7 +907,8 @@ function renderMessage(
     "bubble" +
     (
       me &&
-      message.from === me.id
+      message.from ===
+        me.id
         ? " mine"
         : ""
     );
@@ -1112,9 +918,7 @@ function renderMessage(
     "image"
   ) {
 
-    if (
-      message.file?.url
-    ) {
+    if (message.file?.url) {
 
       const img =
         document.createElement(
@@ -1141,9 +945,7 @@ function renderMessage(
     "video"
   ) {
 
-    if (
-      message.file?.url
-    ) {
+    if (message.file?.url) {
 
       const video =
         document.createElement(
@@ -1169,9 +971,7 @@ function renderMessage(
     "file"
   ) {
 
-    if (
-      message.file?.url
-    ) {
+    if (message.file?.url) {
 
       const link =
         document.createElement(
@@ -1236,14 +1036,9 @@ function renderMessage(
   );
 }
 
+function formatTime(timestamp) {
 
-function formatTime(
-  timestamp
-) {
-
-  if (!timestamp) {
-    return "";
-  }
+  if (!timestamp) return "";
 
   try {
 
@@ -1252,11 +1047,8 @@ function formatTime(
     ).toLocaleTimeString(
       [],
       {
-        hour:
-          "2-digit",
-
-        minute:
-          "2-digit"
+        hour: "2-digit",
+        minute: "2-digit"
       }
     );
 
@@ -1266,22 +1058,17 @@ function formatTime(
   }
 }
 
-
 function scrollMessages() {
 
-  if (!messagesEl) {
-    return;
-  }
+  if (!messagesEl) return;
 
   requestAnimationFrame(
     () => {
-
       messagesEl.scrollTop =
         messagesEl.scrollHeight;
     }
   );
 }
-
 
 /* =========================
    SEND MESSAGE
@@ -1291,13 +1078,13 @@ if (composer) {
 
   composer.addEventListener(
     "submit",
-    async event => {
+    event => {
 
       event.preventDefault();
 
       if (
-        !me?.id ||
-        !selectedUser?.id ||
+        !me ||
+        !selectedUser ||
         !textInput
       ) {
         return;
@@ -1306,9 +1093,7 @@ if (composer) {
       const text =
         textInput.value.trim();
 
-      if (!text) {
-        return;
-      }
+      if (!text) return;
 
       socket.emit(
         "message",
@@ -1323,8 +1108,7 @@ if (composer) {
         }
       );
 
-      textInput.value =
-        "";
+      textInput.value = "";
 
       socket.emit(
         "typing",
@@ -1340,7 +1124,6 @@ if (composer) {
   );
 }
 
-
 /* =========================
    RECEIVE MESSAGE
 ========================= */
@@ -1349,9 +1132,7 @@ socket.on(
   "message",
   message => {
 
-    if (!message) {
-      return;
-    }
+    if (!message) return;
 
     if (
       selectedUser &&
@@ -1391,7 +1172,6 @@ socket.on(
   }
 );
 
-
 /* =========================
    FILE UPLOAD
 ========================= */
@@ -1405,13 +1185,11 @@ if (fileInput) {
       const file =
         fileInput.files?.[0];
 
-      if (!file) {
-        return;
-      }
+      if (!file) return;
 
       if (
-        !me?.id ||
-        !selectedUser?.id
+        !me ||
+        !selectedUser
       ) {
 
         alert(
@@ -1434,10 +1212,7 @@ if (fileInput) {
   );
 }
 
-
-async function sendFile(
-  file
-) {
+async function sendFile(file) {
 
   try {
 
@@ -1455,7 +1230,6 @@ async function sendFile(
         {
           method:
             "POST",
-
           body:
             formData
         }
@@ -1536,13 +1310,11 @@ async function sendFile(
   }
 }
 
-
 /* =========================
    TYPING
 ========================= */
 
-let typingTimer =
-  null;
+let typingTimer = null;
 
 if (textInput) {
 
@@ -1551,8 +1323,8 @@ if (textInput) {
     () => {
 
       if (
-        !selectedUser?.id ||
-        !me?.id
+        !selectedUser ||
+        !me
       ) {
         return;
       }
@@ -1594,7 +1366,6 @@ if (textInput) {
   );
 }
 
-
 socket.on(
   "typing",
   data => {
@@ -1628,7 +1399,6 @@ socket.on(
           typingEl &&
           data.active
         ) {
-
           typingEl.textContent =
             "";
         }
@@ -1639,7 +1409,6 @@ socket.on(
   }
 );
 
-
 /* =========================
    SOCKET CONNECT
 ========================= */
@@ -1648,21 +1417,51 @@ socket.on(
   "connect",
   () => {
 
-    if (me?.id) {
+    console.log(
+      "MATRYX CHAT connected:",
+      socket.id
+    );
+
+    if (me) {
 
       socket.emit(
         "join",
-        {
-          id:
-            me.id
-        }
+        me
       );
-    }
 
-    loadUsers();
+      /*
+       * Critical mobile fix:
+       * Every reconnect gets a fresh
+       * PostgreSQL-backed users list.
+       */
+      loadUsers(true);
+
+      scheduleUsersRefresh();
+    }
   }
 );
 
+socket.on(
+  "disconnect",
+  reason => {
+
+    console.log(
+      "MATRYX CHAT disconnected:",
+      reason
+    );
+  }
+);
+
+socket.on(
+  "connect_error",
+  error => {
+
+    console.error(
+      "SOCKET CONNECTION ERROR:",
+      error
+    );
+  }
+);
 
 socket.on(
   "users:update",
@@ -1679,21 +1478,26 @@ socket.on(
 
       updateSelectedUser();
     }
+
+    /*
+     * Also verify with a fresh API request.
+     * This prevents stale mobile state.
+     */
+    if (me) {
+      scheduleUsersRefresh();
+    }
   }
 );
-
 
 /* =========================
    CALLS
 ========================= */
 
-async function startCall(
-  video
-) {
+async function startCall(video) {
 
   if (
-    !me?.id ||
-    !selectedUser?.id
+    !me ||
+    !selectedUser
   ) {
 
     alert(
@@ -1713,19 +1517,15 @@ async function startCall(
   currentCallVideo =
     !!video;
 
-  isMuted =
-    false;
+  isMuted = false;
 
   try {
 
     localStream =
       await navigator.mediaDevices
         .getUserMedia({
-          audio:
-            true,
-
-          video:
-            !!video
+          audio: true,
+          video: !!video
         });
 
     openCallScreen(
@@ -1734,7 +1534,6 @@ async function startCall(
     );
 
     if (localVideo) {
-
       localVideo.srcObject =
         localStream;
     }
@@ -1790,7 +1589,6 @@ async function startCall(
   }
 }
 
-
 /* =========================
    CREATE PEER
 ========================= */
@@ -1840,7 +1638,6 @@ function createPeerConnection() {
           );
 
         if (placeholder) {
-
           placeholder.style.display =
             "none";
         }
@@ -1850,9 +1647,7 @@ function createPeerConnection() {
   peerConnection.onconnectionstatechange =
     () => {
 
-      if (
-        !peerConnection
-      ) {
+      if (!peerConnection) {
         return;
       }
 
@@ -1864,12 +1659,10 @@ function createPeerConnection() {
         state === "disconnected" ||
         state === "closed"
       ) {
-
         endCall();
       }
     };
 }
-
 
 /* =========================
    INCOMING CALL
@@ -1880,7 +1673,7 @@ socket.on(
   async data => {
 
     if (
-      !me?.id ||
+      !me ||
       !data?.from ||
       !data?.offer
     ) {
@@ -1935,17 +1728,14 @@ socket.on(
     currentCallVideo =
       !!data.video;
 
-    isMuted =
-      false;
+    isMuted = false;
 
     try {
 
       localStream =
         await navigator.mediaDevices
           .getUserMedia({
-            audio:
-              true,
-
+            audio: true,
             video:
               !!data.video
           });
@@ -1956,7 +1746,6 @@ socket.on(
       );
 
       if (localVideo) {
-
         localVideo.srcObject =
           localStream;
       }
@@ -2013,7 +1802,6 @@ socket.on(
   }
 );
 
-
 /* =========================
    CALL ANSWER
 ========================= */
@@ -2047,7 +1835,6 @@ socket.on(
     }
   }
 );
-
 
 /* =========================
    ICE
@@ -2083,21 +1870,16 @@ socket.on(
   }
 );
 
-
 /* =========================
-   REMOTE END CALL
+   END CALL REMOTE
 ========================= */
 
 socket.on(
   "call:end",
   () => {
-
-    endCall(
-      false
-    );
+    endCall(false);
   }
 );
-
 
 /* =========================
    CALL UI
@@ -2108,22 +1890,18 @@ function openCallScreen(
   name
 ) {
 
-  if (!callScreen) {
-    return;
-  }
+  if (!callScreen) return;
 
   callScreen.classList.remove(
     "hidden"
   );
 
   if (callTitle) {
-
     callTitle.textContent =
       `${video ? "Video" : "Voice"} call • ${name || "User"}`;
   }
 
   if (remoteVideo) {
-
     remoteVideo.style.display =
       video
         ? "block"
@@ -2131,14 +1909,12 @@ function openCallScreen(
   }
 
   if (localVideo) {
-
     localVideo.style.display =
       video
         ? "block"
         : "none";
   }
 }
-
 
 /* =========================
    END CALL
@@ -2193,13 +1969,11 @@ function endCall(
   }
 
   if (remoteVideo) {
-
     remoteVideo.srcObject =
       null;
   }
 
   if (localVideo) {
-
     localVideo.srcObject =
       null;
   }
@@ -2214,13 +1988,11 @@ function endCall(
     false;
 
   if (callScreen) {
-
     callScreen.classList.add(
       "hidden"
     );
   }
 }
-
 
 /* =========================
    MUTE
@@ -2228,9 +2000,7 @@ function endCall(
 
 function toggleMute() {
 
-  if (!localStream) {
-    return;
-  }
+  if (!localStream) return;
 
   isMuted =
     !isMuted;
@@ -2239,21 +2009,17 @@ function toggleMute() {
     .getAudioTracks()
     .forEach(
       track => {
-
         track.enabled =
           !isMuted;
       }
     );
 }
 
-
 /* =========================
    ESCAPE HTML
 ========================= */
 
-function escapeHtml(
-  value
-) {
+function escapeHtml(value) {
 
   return String(
     value || ""
@@ -2280,18 +2046,16 @@ function escapeHtml(
     );
 }
 
-
 /* =========================
    DIRECT USERNAME UPDATE
 ========================= */
 
 async function updateUsernameDirect(
-  username
+  username,
+  showAlert = false
 ) {
 
-  if (!me?.id) {
-    return;
-  }
+  if (!me) return;
 
   if (
     username.length < 2 ||
@@ -2311,21 +2075,22 @@ async function updateUsernameDirect(
       await fetch(
         "/api/profile",
         {
-          method:
-            "PUT",
+          method: "PUT",
 
           headers: {
             "Content-Type":
               "application/json"
           },
 
-          body:
-            JSON.stringify({
-              id:
-                me.id,
+          cache:
+            "no-store",
 
-              username
-            })
+          body: JSON.stringify({
+            id:
+              me.id,
+
+            username
+          })
         }
       );
 
@@ -2342,41 +2107,27 @@ async function updateUsernameDirect(
       return;
     }
 
-    /*
-      Never allow profile update to
-      replace the permanent local ID.
-    */
-
-    if (
-      data.id !== me.id
-    ) {
-
-      alert(
-        "Security error: User ID changed unexpectedly."
-      );
-
-      return;
-    }
-
-    me = {
-      ...me,
-      ...data,
-      id:
-        me.id
-    };
+    me =
+      data;
 
     saveMe();
 
     updateProfileUI();
 
-    renderUsers();
+    await loadUsers(true);
 
     updateSelectedUser();
+
+    if (showAlert) {
+      alert(
+        "Name updated successfully."
+      );
+    }
 
   } catch (error) {
 
     console.error(
-      "USERNAME UPDATE ERROR:",
+      "PROFILE UPDATE ERROR:",
       error
     );
 
@@ -2385,7 +2136,6 @@ async function updateUsernameDirect(
     );
   }
 }
-
 
 /* =========================
    GLOBAL FUNCTIONS
@@ -2415,9 +2165,8 @@ window.editUsername =
 window.uploadAvatar =
   uploadAvatar;
 
-
 /* =========================
-   PROFILE CLICK SUPPORT
+   PROFILE CLICK
 ========================= */
 
 if (meEl) {
@@ -2434,7 +2183,6 @@ if (meEl) {
   );
 }
 
-
 if (myAvatar) {
 
   myAvatar.style.cursor =
@@ -2445,10 +2193,76 @@ if (myAvatar) {
 
   myAvatar.addEventListener(
     "click",
-    editUsername
+    () => {
+
+      const choice =
+        window.prompt(
+          "Type your new name.\n\nCancel to keep current name.",
+          me?.username || ""
+        );
+
+      if (
+        choice !== null
+      ) {
+
+        const name =
+          choice.trim();
+
+        if (name) {
+          updateUsernameDirect(
+            name
+          );
+        }
+      }
+    }
   );
 }
 
+/* =========================
+   SEARCH
+========================= */
+
+if (searchInput) {
+
+  searchInput.addEventListener(
+    "input",
+    renderUsers
+  );
+}
+
+/* =========================
+   MOBILE / TAB RETURN FIX
+========================= */
+
+document.addEventListener(
+  "visibilitychange",
+  () => {
+
+    if (
+      !document.hidden &&
+      me
+    ) {
+
+      loadUsers(true);
+
+      if (
+        selectedUser
+      ) {
+        loadMessages();
+      }
+    }
+  }
+);
+
+window.addEventListener(
+  "online",
+  () => {
+
+    if (me) {
+      loadUsers(true);
+    }
+  }
+);
 
 /* =========================
    INIT
@@ -2456,61 +2270,23 @@ if (myAvatar) {
 
 document.addEventListener(
   "DOMContentLoaded",
-  async () => {
+  () => {
 
     if (loadMe()) {
 
       showApp();
 
       /*
-        Refresh account/contact data
-        from server.
+       * Multiple refresh points make the
+       * mobile client recover from stale
+       * page state/network reconnects.
+       */
+      loadUsers(true);
 
-        If server no longer has this ID,
-        local login is removed so the UI
-        doesn't show a fake account.
-      */
-
-      const loaded =
-        await loadUsers();
-
-      if (
-        loaded &&
-        me?.id
-      ) {
-
-        const serverUser =
-          users.find(
-            user =>
-              user.id === me.id
-          );
-
-        if (serverUser) {
-
-          me = {
-            ...me,
-            ...serverUser,
-            id:
-              me.id
-          };
-
-          saveMe();
-
-          updateProfileUI();
-
-        } else {
-
-          /*
-            Do NOT silently register a new
-            account. Existing account data
-            must never be replaced.
-          */
-
-          console.warn(
-            "Saved User ID was not found on server."
-          );
-        }
-      }
+      setTimeout(
+        () => loadUsers(true),
+        1000
+      );
 
     } else {
 
