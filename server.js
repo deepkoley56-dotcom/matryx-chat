@@ -4,6 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
 const crypto = require("crypto");
+const { Pool } = require("pg");
 const { Server } = require("socket.io");
 
 const app = express();
@@ -18,241 +19,110 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 
-const DATA = path.join(__dirname, "data");
 const UPLOADS = path.join(__dirname, "uploads");
 
-const dbFile = path.join(DATA, "db.json");
-const backupFile = path.join(DATA, "db.json.bak");
-const tempFile = path.join(DATA, "db.json.tmp");
+fs.mkdirSync(UPLOADS, {
+  recursive: true
+});
 
-fs.mkdirSync(DATA, { recursive: true });
-fs.mkdirSync(UPLOADS, { recursive: true });
+/* =========================================================
+   POSTGRESQL DATABASE
+========================================================= */
 
-/* =========================
-   DATABASE
-========================= */
+const DATABASE_URL =
+  process.env.DATABASE_URL;
 
-function createDatabase() {
-  if (fs.existsSync(dbFile)) {
-    return;
-  }
-
-  const initialData = {
-    users: [],
-    messages: []
-  };
-
-  fs.writeFileSync(
-    dbFile,
-    JSON.stringify(initialData, null, 2),
-    "utf8"
-  );
-
-  fs.copyFileSync(dbFile, backupFile);
-}
-
-createDatabase();
-
-
-/* =========================
-   READ DATABASE SAFELY
-========================= */
-
-function readDatabaseFile(file) {
-  try {
-    if (!fs.existsSync(file)) {
-      return null;
-    }
-
-    const raw = fs.readFileSync(
-      file,
-      "utf8"
-    );
-
-    if (!raw.trim()) {
-      return null;
-    }
-
-    const data = JSON.parse(raw);
-
-    if (
-      !data ||
-      typeof data !== "object"
-    ) {
-      return null;
-    }
-
-    if (!Array.isArray(data.users)) {
-      data.users = [];
-    }
-
-    if (!Array.isArray(data.messages)) {
-      data.messages = [];
-    }
-
-    return data;
-
-  } catch (error) {
-    console.error(
-      `DATABASE READ ERROR (${file}):`,
-      error.message
-    );
-
-    return null;
-  }
-}
-
-
-/* =========================
-   DATABASE
-   NEVER RESET EXISTING DATA
-========================= */
-
-function db() {
-  createDatabase();
-
-  let data =
-    readDatabaseFile(dbFile);
-
-  if (data) {
-    return data;
-  }
-
+if (!DATABASE_URL) {
   console.error(
-    "WARNING: Main database could not be read."
-  );
-
-  /*
-    IMPORTANT:
-    Never return an empty database here.
-    That could make existing accounts
-    appear to have disappeared.
-  */
-
-  const backup =
-    readDatabaseFile(backupFile);
-
-  if (backup) {
-
-    console.warn(
-      "Restoring database from backup..."
-    );
-
-    try {
-      fs.copyFileSync(
-        backupFile,
-        dbFile
-      );
-    } catch (error) {
-      console.error(
-        "BACKUP RESTORE ERROR:",
-        error
-      );
-    }
-
-    return backup;
-  }
-
-  /*
-    No valid main DB and no backup.
-    Fail safely instead of creating an
-    empty database that could overwrite
-    the user's existing account state.
-  */
-
-  throw new Error(
-    "Database unavailable. Existing data was not reset."
+    "DATABASE_URL is not configured."
   );
 }
 
+const pool = DATABASE_URL
+  ? new Pool({
+      connectionString: DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false
+      }
+    })
+  : null;
 
-/* =========================
-   SAFE DATABASE SAVE
-========================= */
-
-function save(data) {
-
-  if (
-    !data ||
-    !Array.isArray(data.users) ||
-    !Array.isArray(data.messages)
-  ) {
+async function query(
+  text,
+  params = []
+) {
+  if (!pool) {
     throw new Error(
-      "Invalid database structure."
+      "DATABASE_URL is not configured."
     );
   }
 
-  /*
-    Write to temporary file first.
-  */
-
-  fs.writeFileSync(
-    tempFile,
-    JSON.stringify(
-      data,
-      null,
-      2
-    ),
-    "utf8"
-  );
-
-  /*
-    Verify the temporary file before
-    replacing the main database.
-  */
-
-  const verification =
-    readDatabaseFile(tempFile);
-
-  if (!verification) {
-
-    try {
-      fs.unlinkSync(tempFile);
-    } catch {}
-
-    throw new Error(
-      "Database verification failed."
-    );
-  }
-
-  /*
-    Keep backup of the current valid DB.
-  */
-
-  if (fs.existsSync(dbFile)) {
-
-    try {
-
-      fs.copyFileSync(
-        dbFile,
-        backupFile
-      );
-
-    } catch (error) {
-
-      console.error(
-        "DATABASE BACKUP ERROR:",
-        error
-      );
-    }
-  }
-
-  /*
-    Replace main database atomically.
-  */
-
-  fs.renameSync(
-    tempFile,
-    dbFile
+  return pool.query(
+    text,
+    params
   );
 }
 
+/* =========================================================
+   DATABASE INITIALIZATION
+========================================================= */
 
-/* =========================
+async function initDatabase() {
+
+  if (!pool) {
+    throw new Error(
+      "PostgreSQL cannot start without DATABASE_URL."
+    );
+  }
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT NOT NULL,
+      phone TEXT UNIQUE NOT NULL,
+      avatar TEXT DEFAULT NULL,
+      password_salt TEXT,
+      password_hash TEXT,
+      created_at BIGINT NOT NULL
+    )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      sender_id TEXT NOT NULL,
+      receiver_id TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'text',
+      text TEXT DEFAULT '',
+      file_url TEXT DEFAULT NULL,
+      file_name TEXT DEFAULT NULL,
+      file_mime TEXT DEFAULT NULL,
+      file_size BIGINT DEFAULT NULL,
+      created_at BIGINT NOT NULL
+    )
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS messages_sender_receiver_idx
+    ON messages(sender_id, receiver_id)
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS messages_receiver_sender_idx
+    ON messages(receiver_id, sender_id)
+  `);
+
+  console.log(
+    "PostgreSQL database initialized successfully."
+  );
+}
+
+/* =========================================================
    SAFE USER
-========================= */
+========================================================= */
 
 function safeUser(user) {
+
   return {
     id: user.id,
     username: user.username,
@@ -261,71 +131,50 @@ function safeUser(user) {
   };
 }
 
-
-/* =========================
+/* =========================================================
    HELPERS
-========================= */
+========================================================= */
 
 function normalizePhone(value) {
+
   return String(value || "")
     .replace(/[^\d+]/g, "")
     .trim();
 }
 
+function createId() {
 
-/*
-  Permanent User ID generator.
-
-  This ID is generated ONLY during
-  registration.
-
-  Existing users NEVER receive a new ID.
-*/
-
-function createUserId() {
   return (
-    "usr_" +
     Date.now().toString(36) +
-    "_" +
-    crypto.randomBytes(12).toString("hex")
+    crypto
+      .randomBytes(8)
+      .toString("hex")
   );
 }
 
-
-/*
-  Message IDs can be different from
-  User IDs.
-*/
-
-function createMessageId() {
-  return (
-    "msg_" +
-    Date.now().toString(36) +
-    "_" +
-    crypto.randomBytes(8).toString("hex")
-  );
-}
-
-
-function createPasswordHash(password) {
+function createPasswordHash(
+  password
+) {
 
   const salt =
-    crypto.randomBytes(16)
+    crypto
+      .randomBytes(16)
       .toString("hex");
 
   const hash =
-    crypto.scryptSync(
-      String(password),
-      salt,
-      64
-    ).toString("hex");
+    crypto
+      .scryptSync(
+        String(password),
+        salt,
+        64
+      )
+      .toString("hex");
 
   return {
     salt,
     hash
   };
 }
-
 
 function checkPassword(
   password,
@@ -336,11 +185,13 @@ function checkPassword(
   try {
 
     const hash =
-      crypto.scryptSync(
-        String(password),
-        salt,
-        64
-      ).toString("hex");
+      crypto
+        .scryptSync(
+          String(password),
+          salt,
+          64
+        )
+        .toString("hex");
 
     return crypto.timingSafeEqual(
       Buffer.from(hash, "hex"),
@@ -353,12 +204,80 @@ function checkPassword(
   }
 }
 
+/* =========================================================
+   DATABASE USER HELPERS
+========================================================= */
 
-/* =========================
+async function findUserById(id) {
+
+  const result = await query(
+    `
+      SELECT
+        id,
+        username,
+        phone,
+        avatar,
+        password_salt,
+        password_hash,
+        created_at
+      FROM users
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [id]
+  );
+
+  return result.rows[0] || null;
+}
+
+async function findUserByPhone(phone) {
+
+  const result = await query(
+    `
+      SELECT
+        id,
+        username,
+        phone,
+        avatar,
+        password_salt,
+        password_hash,
+        created_at
+      FROM users
+      WHERE phone = $1
+      LIMIT 1
+    `,
+    [phone]
+  );
+
+  return result.rows[0] || null;
+}
+
+async function getAllUsers() {
+
+  const result = await query(
+    `
+      SELECT
+        id,
+        username,
+        phone,
+        avatar
+      FROM users
+      ORDER BY created_at ASC
+    `
+  );
+
+  return result.rows;
+}
+
+/* =========================================================
    MIDDLEWARE
-========================= */
+========================================================= */
 
-app.use(express.json());
+app.use(
+  express.json({
+    limit: "2mb"
+  })
+);
 
 app.use(
   express.static(
@@ -374,10 +293,9 @@ app.use(
   express.static(UPLOADS)
 );
 
-
-/* =========================
+/* =========================================================
    FILE UPLOAD
-========================= */
+========================================================= */
 
 const storage =
   multer.diskStorage({
@@ -409,14 +327,14 @@ const storage =
         cb(
           null,
           Date.now() +
-          "-" +
-          crypto.randomBytes(8)
-            .toString("hex") +
-          ext
+            "-" +
+            crypto
+              .randomBytes(8)
+              .toString("hex") +
+            ext
         );
       }
   });
-
 
 const upload =
   multer({
@@ -425,18 +343,19 @@ const upload =
 
     limits: {
       fileSize:
-        100 * 1024 * 1024
+        100 *
+        1024 *
+        1024
     }
   });
 
-
-/* =========================
+/* =========================================================
    REGISTER
-========================= */
+========================================================= */
 
 app.post(
   "/api/register",
-  (req, res) => {
+  async (req, res) => {
 
     try {
 
@@ -456,107 +375,107 @@ app.post(
         )
       ) {
 
-        return res.status(400).json({
-          error:
-            "Enter a valid phone number."
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "Enter a valid phone number."
+          });
       }
 
       if (
         password.length < 6
       ) {
 
-        return res.status(400).json({
-          error:
-            "Password must be at least 6 characters."
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "Password must be at least 6 characters."
+          });
       }
 
       if (
         password.length > 128
       ) {
 
-        return res.status(400).json({
-          error:
-            "Password is too long."
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "Password is too long."
+          });
       }
 
-      const data = db();
-
-      /*
-        Phone number is the unique
-        login identifier.
-      */
-
       const existingUser =
-        data.users.find(
-          user =>
-            normalizePhone(
-              user.phone
-            ) === phone
+        await findUserByPhone(
+          phone
         );
 
       if (existingUser) {
 
-        return res.status(409).json({
-          error:
-            "Account already exists. Please login."
-        });
+        return res
+          .status(409)
+          .json({
+            error:
+              "Account already exists. Please login."
+          });
       }
+
+      /*
+       * IMPORTANT:
+       * ID is generated ONCE at registration
+       * and stored permanently in PostgreSQL.
+       */
+
+      const permanentId =
+        createId();
 
       const passwordData =
         createPasswordHash(
           password
         );
 
-      /*
-        ID is generated ONLY here.
+      const username =
+        "User" +
+        phone.slice(-4);
 
-        After this:
-        - username can change
-        - avatar can change
-        - password can remain
-        - profile can change
-
-        BUT user.id stays the same.
-      */
-
-      const user = {
-
-        id:
-          createUserId(),
-
-        username:
-          "User" +
-          phone.slice(-4),
-
-        phone,
-
-        avatar:
+      await query(
+        `
+          INSERT INTO users (
+            id,
+            username,
+            phone,
+            avatar,
+            password_salt,
+            password_hash,
+            created_at
+          )
+          VALUES (
+            $1,
+            $2,
+            $3,
+            $4,
+            $5,
+            $6,
+            $7
+          )
+        `,
+        [
+          permanentId,
+          username,
+          phone,
           null,
-
-        passwordSalt:
           passwordData.salt,
-
-        passwordHash:
           passwordData.hash,
-
-        createdAt:
           Date.now()
-      };
-
-      data.users.push(
-        user
+        ]
       );
 
-      save(data);
-
-      console.log(
-        "NEW USER REGISTERED:",
-        user.id,
-        user.phone
-      );
+      const user =
+        await findUserById(
+          permanentId
+        );
 
       broadcastUsers();
 
@@ -571,22 +490,23 @@ app.post(
         error
       );
 
-      return res.status(500).json({
-        error:
-          "Registration failed. Existing accounts were not changed."
-      });
+      return res
+        .status(500)
+        .json({
+          error:
+            "Registration failed."
+        });
     }
   }
 );
 
-
-/* =========================
+/* =========================================================
    LOGIN
-========================= */
+========================================================= */
 
 app.post(
   "/api/login",
-  (req, res) => {
+  async (req, res) => {
 
     try {
 
@@ -605,70 +525,57 @@ app.post(
         !password
       ) {
 
-        return res.status(400).json({
-          error:
-            "Phone number and password are required."
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "Phone number and password are required."
+          });
       }
 
-      const data = db();
-
       const user =
-        data.users.find(
-          u =>
-            normalizePhone(
-              u.phone
-            ) === phone
+        await findUserByPhone(
+          phone
         );
 
       if (!user) {
 
-        return res.status(404).json({
-          error:
-            "Account not found. Please register first."
-        });
-      }
-
-      /*
-        Existing accounts must have
-        their original ID.
-
-        We do NOT create a new ID
-        during login.
-      */
-
-      if (!user.id) {
-
-        return res.status(409).json({
-          error:
-            "This account has an invalid User ID. Database migration is required."
-        });
+        return res
+          .status(404)
+          .json({
+            error:
+              "Account not found. Please register first."
+          });
       }
 
       if (
-        !user.passwordHash ||
-        !user.passwordSalt
+        !user.password_hash ||
+        !user.password_salt
       ) {
 
-        return res.status(409).json({
-          error:
-            "This account does not have valid login credentials."
-        });
+        return res
+          .status(409)
+          .json({
+            error:
+              "This account has no valid password data."
+          });
       }
 
       const valid =
         checkPassword(
           password,
-          user.passwordSalt,
-          user.passwordHash
+          user.password_salt,
+          user.password_hash
         );
 
       if (!valid) {
 
-        return res.status(401).json({
-          error:
-            "Incorrect phone number or password."
-        });
+        return res
+          .status(401)
+          .json({
+            error:
+              "Incorrect phone number or password."
+          });
       }
 
       return res.json(
@@ -682,29 +589,31 @@ app.post(
         error
       );
 
-      return res.status(500).json({
-        error:
-          "Login failed. Existing account data was not changed."
-      });
+      return res
+        .status(500)
+        .json({
+          error:
+            "Login failed."
+        });
     }
   }
 );
 
-
-/* =========================
+/* =========================================================
    USERS
-========================= */
+========================================================= */
 
 app.get(
   "/api/users",
-  (req, res) => {
+  async (req, res) => {
 
     try {
 
-      const data = db();
+      const allUsers =
+        await getAllUsers();
 
-      res.json(
-        data.users.map(
+      return res.json(
+        allUsers.map(
           safeUser
         )
       );
@@ -716,22 +625,23 @@ app.get(
         error
       );
 
-      res.status(500).json({
-        error:
-          "Unable to load users."
-      });
+      return res
+        .status(500)
+        .json({
+          error:
+            "Unable to load users."
+        });
     }
   }
 );
 
-
-/* =========================
-   EDIT PROFILE
-========================= */
+/* =========================================================
+   PROFILE UPDATE
+========================================================= */
 
 app.put(
   "/api/profile",
-  (req, res) => {
+  async (req, res) => {
 
     try {
 
@@ -754,63 +664,66 @@ app.put(
 
       if (!id) {
 
-        return res.status(400).json({
-          error:
-            "User ID is required."
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "User ID is required."
+          });
       }
 
       if (!username) {
 
-        return res.status(400).json({
-          error:
-            "Name is required."
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "Name is required."
+          });
       }
 
       if (
         username.length < 2
       ) {
 
-        return res.status(400).json({
-          error:
-            "Name must be at least 2 characters."
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "Name must be at least 2 characters."
+          });
       }
 
       if (
         username.length > 30
       ) {
 
-        return res.status(400).json({
-          error:
-            "Name must be 30 characters or less."
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "Name must be 30 characters or less."
+          });
       }
 
-      const data = db();
-
       const user =
-        data.users.find(
-          item =>
-            item.id === id
+        await findUserById(
+          id
         );
 
       if (!user) {
 
-        return res.status(404).json({
-          error:
-            "User not found."
-        });
+        return res
+          .status(404)
+          .json({
+            error:
+              "User not found."
+          });
       }
 
       /*
-        IMPORTANT:
-        user.id is NEVER changed.
-      */
-
-      user.username =
-        username;
+       * ID and phone are NEVER changed here.
+       */
 
       if (
         avatar === null ||
@@ -819,23 +732,55 @@ app.put(
         )
       ) {
 
-        user.avatar =
-          avatar;
+        await query(
+          `
+            UPDATE users
+            SET
+              username = $1,
+              avatar = $2
+            WHERE id = $3
+          `,
+          [
+            username,
+            avatar,
+            id
+          ]
+        );
+
+      } else {
+
+        await query(
+          `
+            UPDATE users
+            SET
+              username = $1
+            WHERE id = $2
+          `,
+          [
+            username,
+            id
+          ]
+        );
       }
 
-      save(data);
-
       const updated =
-        safeUser(user);
+        await findUserById(
+          id
+        );
+
+      const safe =
+        safeUser(updated);
 
       io.emit(
         "profile:update",
-        updated
+        safe
       );
 
       broadcastUsers();
 
-      res.json(updated);
+      return res.json(
+        safe
+      );
 
     } catch (error) {
 
@@ -844,23 +789,24 @@ app.put(
         error
       );
 
-      res.status(500).json({
-        error:
-          "Profile update failed. Existing account data was not reset."
-      });
+      return res
+        .status(500)
+        .json({
+          error:
+            "Profile update failed."
+        });
     }
   }
 );
 
-
-/* =========================
+/* =========================================================
    PROFILE PHOTO
-========================= */
+========================================================= */
 
 app.post(
   "/api/profile/avatar",
   upload.single("avatar"),
-  (req, res) => {
+  async (req, res) => {
 
     try {
 
@@ -871,18 +817,30 @@ app.post(
 
       if (!id) {
 
-        return res.status(400).json({
-          error:
-            "User ID is required."
-        });
+        if (req.file) {
+          try {
+            fs.unlinkSync(
+              req.file.path
+            );
+          } catch {}
+        }
+
+        return res
+          .status(400)
+          .json({
+            error:
+              "User ID is required."
+          });
       }
 
       if (!req.file) {
 
-        return res.status(400).json({
-          error:
-            "No profile photo selected."
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "No profile photo selected."
+          });
       }
 
       if (
@@ -897,18 +855,17 @@ app.post(
           );
         } catch {}
 
-        return res.status(400).json({
-          error:
-            "Only image files are allowed."
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "Only image files are allowed."
+          });
       }
 
-      const data = db();
-
       const user =
-        data.users.find(
-          item =>
-            item.id === id
+        await findUserById(
+          id
         );
 
       if (!user) {
@@ -919,42 +876,50 @@ app.post(
           );
         } catch {}
 
-        return res.status(404).json({
-          error:
-            "User not found."
-        });
+        return res
+          .status(404)
+          .json({
+            error:
+              "User not found."
+          });
       }
 
       const avatarUrl =
         "/uploads/" +
         req.file.filename;
 
-      /*
-        Only avatar changes.
-        User ID remains untouched.
-      */
-
-      user.avatar =
-        avatarUrl;
-
-      save(data);
+      await query(
+        `
+          UPDATE users
+          SET avatar = $1
+          WHERE id = $2
+        `,
+        [
+          avatarUrl,
+          id
+        ]
+      );
 
       const updated =
-        safeUser(user);
+        await findUserById(
+          id
+        );
+
+      const safe =
+        safeUser(updated);
 
       io.emit(
         "profile:update",
-        updated
+        safe
       );
 
       broadcastUsers();
 
-      res.json({
+      return res.json({
         avatar:
           avatarUrl,
-
         user:
-          updated
+          safe
       });
 
     } catch (error) {
@@ -964,47 +929,117 @@ app.post(
         error
       );
 
-      res.status(500).json({
-        error:
-          "Profile photo upload failed."
-      });
+      if (req.file) {
+        try {
+          fs.unlinkSync(
+            req.file.path
+          );
+        } catch {}
+      }
+
+      return res
+        .status(500)
+        .json({
+          error:
+            "Profile photo upload failed."
+        });
     }
   }
 );
 
-
-/* =========================
+/* =========================================================
    MESSAGES
-========================= */
+========================================================= */
 
 app.get(
   "/api/messages/:a/:b",
-  (req, res) => {
+  async (req, res) => {
 
     try {
-
-      const data = db();
 
       const {
         a,
         b
       } = req.params;
 
-      const messages =
-        data.messages.filter(
-          message =>
-            (
-              message.from === a &&
-              message.to === b
-            ) ||
-            (
-              message.from === b &&
-              message.to === a
-            )
+      const result =
+        await query(
+          `
+            SELECT
+              id,
+              sender_id AS "from",
+              receiver_id AS "to",
+              type,
+              text,
+              file_url,
+              file_name,
+              file_mime,
+              file_size,
+              created_at
+            FROM messages
+            WHERE
+              (
+                sender_id = $1
+                AND receiver_id = $2
+              )
+              OR
+              (
+                sender_id = $2
+                AND receiver_id = $1
+              )
+            ORDER BY created_at ASC
+            LIMIT 200
+          `,
+          [
+            a,
+            b
+          ]
         );
 
-      res.json(
-        messages.slice(-200)
+      const messages =
+        result.rows.map(
+          message => ({
+            id:
+              message.id,
+
+            from:
+              message.from,
+
+            to:
+              message.to,
+
+            type:
+              message.type,
+
+            text:
+              message.text || "",
+
+            file:
+              message.file_url
+                ? {
+                    url:
+                      message.file_url,
+
+                    name:
+                      message.file_name,
+
+                    mime:
+                      message.file_mime,
+
+                    size:
+                      message.file_size
+                  }
+                : null,
+
+            time:
+              Number(
+                message.created_at
+              )
+          })
+        );
+
+      return res.json(
+        messages
       );
 
     } catch (error) {
@@ -1014,36 +1049,38 @@ app.get(
         error
       );
 
-      res.status(500).json({
-        error:
-          "Unable to load messages."
-      });
+      return res
+        .status(500)
+        .json({
+          error:
+            "Unable to load messages."
+        });
     }
   }
 );
 
-
-/* =========================
-   FILE UPLOAD
-========================= */
+/* =========================================================
+   GENERAL FILE UPLOAD
+========================================================= */
 
 app.post(
   "/api/upload",
   upload.single("file"),
-  (req, res) => {
+  async (req, res) => {
 
     try {
 
       if (!req.file) {
 
-        return res.status(400).json({
-          error:
-            "No file uploaded."
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "No file uploaded."
+          });
       }
 
-      res.json({
-
+      return res.json({
         url:
           "/uploads/" +
           req.file.filename,
@@ -1065,30 +1102,33 @@ app.post(
         error
       );
 
-      res.status(500).json({
-        error:
-          "File upload failed."
-      });
+      return res
+        .status(500)
+        .json({
+          error:
+            "File upload failed."
+        });
     }
   }
 );
 
-
-/* =========================
+/* =========================================================
    ONLINE USERS
-========================= */
+========================================================= */
 
 const online =
   new Map();
 
-
-function broadcastUsers() {
+async function broadcastUsers() {
 
   try {
 
+    const allUsers =
+      await getAllUsers();
+
     io.emit(
       "users:update",
-      db().users.map(
+      allUsers.map(
         safeUser
       )
     );
@@ -1102,22 +1142,21 @@ function broadcastUsers() {
   }
 }
 
-
-/* =========================
+/* =========================================================
    SOCKET.IO
-========================= */
+========================================================= */
 
 io.on(
   "connection",
   socket => {
 
-    /* =====================
+    /* =====================================================
        JOIN
-    ===================== */
+    ===================================================== */
 
     socket.on(
       "join",
-      user => {
+      async user => {
 
         try {
 
@@ -1125,20 +1164,10 @@ io.on(
             return;
           }
 
-          const data = db();
-
           const realUser =
-            data.users.find(
-              u =>
-                u.id === user.id
+            await findUserById(
+              user.id
             );
-
-          /*
-            Never trust a locally stored
-            username/avatar.
-
-            ID is checked against server DB.
-          */
 
           if (!realUser) {
             return;
@@ -1197,14 +1226,13 @@ io.on(
       }
     );
 
-
-    /* =====================
+    /* =====================================================
        MESSAGE
-    ===================== */
+    ===================================================== */
 
     socket.on(
       "message",
-      msg => {
+      async msg => {
 
         try {
 
@@ -1215,58 +1243,99 @@ io.on(
             return;
           }
 
-          const data = db();
-
-          const sender =
-            data.users.find(
-              u =>
-                u.id ===
-                socket.user.id
-            );
-
           const recipient =
-            data.users.find(
-              u =>
-                u.id === msg.to
+            await findUserById(
+              msg.to
             );
 
-          if (
-            !sender ||
-            !recipient
-          ) {
+          if (!recipient) {
             return;
           }
+
+          const messageId =
+            createId();
+
+          const messageType =
+            msg.type ||
+            "text";
+
+          const text =
+            msg.text || "";
+
+          const file =
+            msg.file || null;
+
+          await query(
+            `
+              INSERT INTO messages (
+                id,
+                sender_id,
+                receiver_id,
+                type,
+                text,
+                file_url,
+                file_name,
+                file_mime,
+                file_size,
+                created_at
+              )
+              VALUES (
+                $1,
+                $2,
+                $3,
+                $4,
+                $5,
+                $6,
+                $7,
+                $8,
+                $9,
+                $10
+              )
+            `,
+            [
+              messageId,
+
+              socket.user.id,
+
+              recipient.id,
+
+              messageType,
+
+              text,
+
+              file?.url || null,
+
+              file?.name || null,
+
+              file?.mime || null,
+
+              file?.size || null,
+
+              Date.now()
+            ]
+          );
 
           const message = {
 
             id:
-              createMessageId(),
+              messageId,
 
             from:
-              sender.id,
+              socket.user.id,
 
             to:
               recipient.id,
 
             type:
-              msg.type ||
-              "text",
+              messageType,
 
-            text:
-              msg.text || "",
+            text,
 
-            file:
-              msg.file || null,
+            file,
 
             time:
               Date.now()
           };
-
-          data.messages.push(
-            message
-          );
-
-          save(data);
 
           io
             .to(
@@ -1293,10 +1362,9 @@ io.on(
       }
     );
 
-
-    /* =====================
+    /* =====================================================
        TYPING
-    ===================== */
+    ===================================================== */
 
     socket.on(
       "typing",
@@ -1327,10 +1395,9 @@ io.on(
       }
     );
 
-
-    /* =====================
-       CALL OFFER
-    ===================== */
+    /* =====================================================
+       WEBRTC OFFER
+    ===================================================== */
 
     socket.on(
       "call:offer",
@@ -1364,10 +1431,9 @@ io.on(
       }
     );
 
-
-    /* =====================
-       CALL ANSWER
-    ===================== */
+    /* =====================================================
+       WEBRTC ANSWER
+    ===================================================== */
 
     socket.on(
       "call:answer",
@@ -1398,10 +1464,9 @@ io.on(
       }
     );
 
-
-    /* =====================
-       ICE
-    ===================== */
+    /* =====================================================
+       WEBRTC ICE
+    ===================================================== */
 
     socket.on(
       "call:ice",
@@ -1432,10 +1497,9 @@ io.on(
       }
     );
 
-
-    /* =====================
+    /* =====================================================
        END CALL
-    ===================== */
+    ===================================================== */
 
     socket.on(
       "call:end",
@@ -1463,14 +1527,13 @@ io.on(
       }
     );
 
-
-    /* =====================
-       PROFILE UPDATE
-    ===================== */
+    /* =====================================================
+       PROFILE UPDATE SOCKET
+    ===================================================== */
 
     socket.on(
       "profile:update",
-      data => {
+      async data => {
 
         try {
 
@@ -1493,13 +1556,9 @@ io.on(
             return;
           }
 
-          const database =
-            db();
-
           const user =
-            database.users.find(
-              item =>
-                item.id === id
+            await findUserById(
+              id
             );
 
           if (!user) {
@@ -1507,17 +1566,30 @@ io.on(
           }
 
           /*
-            Only username changes.
-            ID remains permanent.
-          */
+           * Permanent ID remains untouched.
+           */
 
-          user.username =
-            username;
+          await query(
+            `
+              UPDATE users
+              SET username = $1
+              WHERE id = $2
+            `,
+            [
+              username,
+              id
+            ]
+          );
 
-          save(database);
+          const updated =
+            await findUserById(
+              id
+            );
 
           socket.user =
-            safeUser(user);
+            safeUser(
+              updated
+            );
 
           io.emit(
             "profile:update",
@@ -1529,17 +1601,16 @@ io.on(
         } catch (error) {
 
           console.error(
-            "SOCKET PROFILE UPDATE ERROR:",
+            "SOCKET PROFILE ERROR:",
             error
           );
         }
       }
     );
 
-
-    /* =====================
+    /* =====================================================
        DISCONNECT
-    ===================== */
+    ===================================================== */
 
     socket.on(
       "disconnect",
@@ -1565,7 +1636,9 @@ io.on(
           socket.id
         );
 
-        if (set.size === 0) {
+        if (
+          set.size === 0
+        ) {
 
           online.delete(
             userId
@@ -1588,26 +1661,113 @@ io.on(
   }
 );
 
+/* =========================================================
+   HEALTH CHECK
+========================================================= */
 
-/* =========================
+app.get(
+  "/api/health",
+  async (req, res) => {
+
+    try {
+
+      await query(
+        "SELECT 1"
+      );
+
+      return res.json({
+        ok: true,
+        database:
+          "PostgreSQL connected"
+      });
+
+    } catch (error) {
+
+      console.error(
+        "HEALTH CHECK ERROR:",
+        error
+      );
+
+      return res
+        .status(500)
+        .json({
+          ok: false,
+          database:
+            "PostgreSQL connection failed"
+        });
+    }
+  }
+);
+
+/* =========================================================
    START SERVER
-========================= */
+========================================================= */
 
-server.listen(
-  PORT,
-  "0.0.0.0",
-  () => {
+async function startServer() {
 
-    console.log(
-      `MATRYX CHAT running on port ${PORT}`
+  try {
+
+    await initDatabase();
+
+    server.listen(
+      PORT,
+      "0.0.0.0",
+      () => {
+
+        console.log(
+          `MATRYX CHAT running on port ${PORT}`
+        );
+
+        console.log(
+          "Primary database: PostgreSQL"
+        );
+      }
     );
 
-    console.log(
-      `Database: ${dbFile}`
+  } catch (error) {
+
+    console.error(
+      "DATABASE STARTUP ERROR:",
+      error
     );
 
-    console.log(
-      `Database backup: ${backupFile}`
+    process.exit(1);
+  }
+}
+
+startServer();
+
+/* =========================================================
+   GRACEFUL SHUTDOWN
+========================================================= */
+
+async function shutdown() {
+
+  console.log(
+    "Shutting down MATRYX CHAT..."
+  );
+
+  try {
+
+    await pool?.end();
+
+  } catch (error) {
+
+    console.error(
+      "DATABASE SHUTDOWN ERROR:",
+      error
     );
   }
+
+  process.exit(0);
+}
+
+process.on(
+  "SIGTERM",
+  shutdown
+);
+
+process.on(
+  "SIGINT",
+  shutdown
 );
