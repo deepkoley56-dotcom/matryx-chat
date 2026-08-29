@@ -21,59 +21,232 @@ const PORT = process.env.PORT || 3000;
 const DATA = path.join(__dirname, "data");
 const UPLOADS = path.join(__dirname, "uploads");
 
+const dbFile = path.join(DATA, "db.json");
+const backupFile = path.join(DATA, "db.json.bak");
+const tempFile = path.join(DATA, "db.json.tmp");
+
 fs.mkdirSync(DATA, { recursive: true });
 fs.mkdirSync(UPLOADS, { recursive: true });
-
-const dbFile = path.join(DATA, "db.json");
 
 /* =========================
    DATABASE
 ========================= */
 
 function createDatabase() {
-  if (!fs.existsSync(dbFile)) {
-    fs.writeFileSync(
-      dbFile,
-      JSON.stringify(
-        {
-          users: [],
-          messages: []
-        },
-        null,
-        2
-      )
-    );
+  if (fs.existsSync(dbFile)) {
+    return;
   }
+
+  const initialData = {
+    users: [],
+    messages: []
+  };
+
+  fs.writeFileSync(
+    dbFile,
+    JSON.stringify(initialData, null, 2),
+    "utf8"
+  );
+
+  fs.copyFileSync(dbFile, backupFile);
 }
 
 createDatabase();
 
-function db() {
-  createDatabase();
 
+/* =========================
+   READ DATABASE SAFELY
+========================= */
+
+function readDatabaseFile(file) {
   try {
-    const data = JSON.parse(
-      fs.readFileSync(dbFile, "utf8")
+    if (!fs.existsSync(file)) {
+      return null;
+    }
+
+    const raw = fs.readFileSync(
+      file,
+      "utf8"
     );
 
-    data.users ||= [];
-    data.messages ||= [];
+    if (!raw.trim()) {
+      return null;
+    }
+
+    const data = JSON.parse(raw);
+
+    if (
+      !data ||
+      typeof data !== "object"
+    ) {
+      return null;
+    }
+
+    if (!Array.isArray(data.users)) {
+      data.users = [];
+    }
+
+    if (!Array.isArray(data.messages)) {
+      data.messages = [];
+    }
 
     return data;
-  } catch {
-    return {
-      users: [],
-      messages: []
-    };
+
+  } catch (error) {
+    console.error(
+      `DATABASE READ ERROR (${file}):`,
+      error.message
+    );
+
+    return null;
   }
 }
 
-function save(data) {
-  fs.writeFileSync(
-    dbFile,
-    JSON.stringify(data, null, 2)
+
+/* =========================
+   DATABASE
+   NEVER RESET EXISTING DATA
+========================= */
+
+function db() {
+  createDatabase();
+
+  let data =
+    readDatabaseFile(dbFile);
+
+  if (data) {
+    return data;
+  }
+
+  console.error(
+    "WARNING: Main database could not be read."
+  );
+
+  /*
+    IMPORTANT:
+    Never return an empty database here.
+    That could make existing accounts
+    appear to have disappeared.
+  */
+
+  const backup =
+    readDatabaseFile(backupFile);
+
+  if (backup) {
+
+    console.warn(
+      "Restoring database from backup..."
+    );
+
+    try {
+      fs.copyFileSync(
+        backupFile,
+        dbFile
+      );
+    } catch (error) {
+      console.error(
+        "BACKUP RESTORE ERROR:",
+        error
+      );
+    }
+
+    return backup;
+  }
+
+  /*
+    No valid main DB and no backup.
+    Fail safely instead of creating an
+    empty database that could overwrite
+    the user's existing account state.
+  */
+
+  throw new Error(
+    "Database unavailable. Existing data was not reset."
   );
 }
+
+
+/* =========================
+   SAFE DATABASE SAVE
+========================= */
+
+function save(data) {
+
+  if (
+    !data ||
+    !Array.isArray(data.users) ||
+    !Array.isArray(data.messages)
+  ) {
+    throw new Error(
+      "Invalid database structure."
+    );
+  }
+
+  /*
+    Write to temporary file first.
+  */
+
+  fs.writeFileSync(
+    tempFile,
+    JSON.stringify(
+      data,
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  /*
+    Verify the temporary file before
+    replacing the main database.
+  */
+
+  const verification =
+    readDatabaseFile(tempFile);
+
+  if (!verification) {
+
+    try {
+      fs.unlinkSync(tempFile);
+    } catch {}
+
+    throw new Error(
+      "Database verification failed."
+    );
+  }
+
+  /*
+    Keep backup of the current valid DB.
+  */
+
+  if (fs.existsSync(dbFile)) {
+
+    try {
+
+      fs.copyFileSync(
+        dbFile,
+        backupFile
+      );
+
+    } catch (error) {
+
+      console.error(
+        "DATABASE BACKUP ERROR:",
+        error
+      );
+    }
+  }
+
+  /*
+    Replace main database atomically.
+  */
+
+  fs.renameSync(
+    tempFile,
+    dbFile
+  );
+}
+
 
 /* =========================
    SAFE USER
@@ -88,6 +261,7 @@ function safeUser(user) {
   };
 }
 
+
 /* =========================
    HELPERS
 ========================= */
@@ -98,21 +272,53 @@ function normalizePhone(value) {
     .trim();
 }
 
-function createId() {
+
+/*
+  Permanent User ID generator.
+
+  This ID is generated ONLY during
+  registration.
+
+  Existing users NEVER receive a new ID.
+*/
+
+function createUserId() {
   return (
+    "usr_" +
     Date.now().toString(36) +
+    "_" +
+    crypto.randomBytes(12).toString("hex")
+  );
+}
+
+
+/*
+  Message IDs can be different from
+  User IDs.
+*/
+
+function createMessageId() {
+  return (
+    "msg_" +
+    Date.now().toString(36) +
+    "_" +
     crypto.randomBytes(8).toString("hex")
   );
 }
 
-function createPasswordHash(password) {
-  const salt = crypto
-    .randomBytes(16)
-    .toString("hex");
 
-  const hash = crypto
-    .scryptSync(String(password), salt, 64)
-    .toString("hex");
+function createPasswordHash(password) {
+
+  const salt =
+    crypto.randomBytes(16)
+      .toString("hex");
+
+  const hash =
+    crypto.scryptSync(
+      String(password),
+      salt,
+      64
+    ).toString("hex");
 
   return {
     salt,
@@ -120,20 +326,33 @@ function createPasswordHash(password) {
   };
 }
 
-function checkPassword(password, salt, savedHash) {
+
+function checkPassword(
+  password,
+  salt,
+  savedHash
+) {
+
   try {
-    const hash = crypto
-      .scryptSync(String(password), salt, 64)
-      .toString("hex");
+
+    const hash =
+      crypto.scryptSync(
+        String(password),
+        salt,
+        64
+      ).toString("hex");
 
     return crypto.timingSafeEqual(
       Buffer.from(hash, "hex"),
       Buffer.from(savedHash, "hex")
     );
+
   } catch {
+
     return false;
   }
 }
+
 
 /* =========================
    MIDDLEWARE
@@ -143,7 +362,10 @@ app.use(express.json());
 
 app.use(
   express.static(
-    path.join(__dirname, "public")
+    path.join(
+      __dirname,
+      "public"
+    )
   )
 );
 
@@ -152,235 +374,386 @@ app.use(
   express.static(UPLOADS)
 );
 
+
 /* =========================
    FILE UPLOAD
 ========================= */
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, UPLOADS);
-  },
+const storage =
+  multer.diskStorage({
 
-  filename: function (req, file, cb) {
-    const ext = path.extname(
-      file.originalname
-    );
+    destination:
+      function (
+        req,
+        file,
+        cb
+      ) {
+        cb(
+          null,
+          UPLOADS
+        );
+      },
 
-    cb(
-      null,
-      Date.now() +
-        "-" +
-        crypto.randomBytes(8).toString("hex") +
-        ext
-    );
-  }
-});
+    filename:
+      function (
+        req,
+        file,
+        cb
+      ) {
 
-const upload = multer({
-  storage,
+        const ext =
+          path.extname(
+            file.originalname
+          );
 
-  limits: {
-    fileSize: 100 * 1024 * 1024
-  }
-});
+        cb(
+          null,
+          Date.now() +
+          "-" +
+          crypto.randomBytes(8)
+            .toString("hex") +
+          ext
+        );
+      }
+  });
+
+
+const upload =
+  multer({
+
+    storage,
+
+    limits: {
+      fileSize:
+        100 * 1024 * 1024
+    }
+  });
+
 
 /* =========================
    REGISTER
 ========================= */
 
-app.post("/api/register", (req, res) => {
-  try {
-    const phone = normalizePhone(
-      req.body.phone
-    );
+app.post(
+  "/api/register",
+  (req, res) => {
 
-    const password = String(
-      req.body.password || ""
-    );
+    try {
 
-    if (!/^\+?\d{7,15}$/.test(phone)) {
-      return res.status(400).json({
-        error: "Enter a valid phone number."
-      });
-    }
+      const phone =
+        normalizePhone(
+          req.body.phone
+        );
 
-    if (password.length < 6) {
-      return res.status(400).json({
+      const password =
+        String(
+          req.body.password || ""
+        );
+
+      if (
+        !/^\+?\d{7,15}$/.test(
+          phone
+        )
+      ) {
+
+        return res.status(400).json({
+          error:
+            "Enter a valid phone number."
+        });
+      }
+
+      if (
+        password.length < 6
+      ) {
+
+        return res.status(400).json({
+          error:
+            "Password must be at least 6 characters."
+        });
+      }
+
+      if (
+        password.length > 128
+      ) {
+
+        return res.status(400).json({
+          error:
+            "Password is too long."
+        });
+      }
+
+      const data = db();
+
+      /*
+        Phone number is the unique
+        login identifier.
+      */
+
+      const existingUser =
+        data.users.find(
+          user =>
+            normalizePhone(
+              user.phone
+            ) === phone
+        );
+
+      if (existingUser) {
+
+        return res.status(409).json({
+          error:
+            "Account already exists. Please login."
+        });
+      }
+
+      const passwordData =
+        createPasswordHash(
+          password
+        );
+
+      /*
+        ID is generated ONLY here.
+
+        After this:
+        - username can change
+        - avatar can change
+        - password can remain
+        - profile can change
+
+        BUT user.id stays the same.
+      */
+
+      const user = {
+
+        id:
+          createUserId(),
+
+        username:
+          "User" +
+          phone.slice(-4),
+
+        phone,
+
+        avatar:
+          null,
+
+        passwordSalt:
+          passwordData.salt,
+
+        passwordHash:
+          passwordData.hash,
+
+        createdAt:
+          Date.now()
+      };
+
+      data.users.push(
+        user
+      );
+
+      save(data);
+
+      console.log(
+        "NEW USER REGISTERED:",
+        user.id,
+        user.phone
+      );
+
+      broadcastUsers();
+
+      return res.json(
+        safeUser(user)
+      );
+
+    } catch (error) {
+
+      console.error(
+        "REGISTER ERROR:",
+        error
+      );
+
+      return res.status(500).json({
         error:
-          "Password must be at least 6 characters."
+          "Registration failed. Existing accounts were not changed."
       });
     }
-
-    if (password.length > 128) {
-      return res.status(400).json({
-        error: "Password is too long."
-      });
-    }
-
-    const data = db();
-
-    const existingUser = data.users.find(
-      user => user.phone === phone
-    );
-
-    if (existingUser) {
-      return res.status(409).json({
-        error:
-          "Account already exists. Please login."
-      });
-    }
-
-    const passwordData =
-      createPasswordHash(password);
-
-    const user = {
-      id: createId(),
-
-      username:
-        "User" + phone.slice(-4),
-
-      phone,
-
-      avatar: null,
-
-      passwordSalt:
-        passwordData.salt,
-
-      passwordHash:
-        passwordData.hash,
-
-      createdAt: Date.now()
-    };
-
-    data.users.push(user);
-
-    save(data);
-
-    broadcastUsers();
-
-    res.json(
-      safeUser(user)
-    );
-
-  } catch (error) {
-    console.error(
-      "REGISTER ERROR:",
-      error
-    );
-
-    res.status(500).json({
-      error: "Registration failed."
-    });
   }
-});
+);
+
 
 /* =========================
    LOGIN
 ========================= */
 
-app.post("/api/login", (req, res) => {
-  try {
-    const phone = normalizePhone(
-      req.body.phone
-    );
+app.post(
+  "/api/login",
+  (req, res) => {
 
-    const password = String(
-      req.body.password || ""
-    );
+    try {
 
-    if (!phone || !password) {
-      return res.status(400).json({
+      const phone =
+        normalizePhone(
+          req.body.phone
+        );
+
+      const password =
+        String(
+          req.body.password || ""
+        );
+
+      if (
+        !phone ||
+        !password
+      ) {
+
+        return res.status(400).json({
+          error:
+            "Phone number and password are required."
+        });
+      }
+
+      const data = db();
+
+      const user =
+        data.users.find(
+          u =>
+            normalizePhone(
+              u.phone
+            ) === phone
+        );
+
+      if (!user) {
+
+        return res.status(404).json({
+          error:
+            "Account not found. Please register first."
+        });
+      }
+
+      /*
+        Existing accounts must have
+        their original ID.
+
+        We do NOT create a new ID
+        during login.
+      */
+
+      if (!user.id) {
+
+        return res.status(409).json({
+          error:
+            "This account has an invalid User ID. Database migration is required."
+        });
+      }
+
+      if (
+        !user.passwordHash ||
+        !user.passwordSalt
+      ) {
+
+        return res.status(409).json({
+          error:
+            "This account does not have valid login credentials."
+        });
+      }
+
+      const valid =
+        checkPassword(
+          password,
+          user.passwordSalt,
+          user.passwordHash
+        );
+
+      if (!valid) {
+
+        return res.status(401).json({
+          error:
+            "Incorrect phone number or password."
+        });
+      }
+
+      return res.json(
+        safeUser(user)
+      );
+
+    } catch (error) {
+
+      console.error(
+        "LOGIN ERROR:",
+        error
+      );
+
+      return res.status(500).json({
         error:
-          "Phone number and password are required."
+          "Login failed. Existing account data was not changed."
       });
     }
-
-    const data = db();
-
-    const user = data.users.find(
-      u => u.phone === phone
-    );
-
-    if (!user) {
-      return res.status(404).json({
-        error:
-          "Account not found. Please register first."
-      });
-    }
-
-    if (
-      !user.passwordHash ||
-      !user.passwordSalt
-    ) {
-      return res.status(409).json({
-        error:
-          "This is an old account. Please create a new phone account."
-      });
-    }
-
-    const valid = checkPassword(
-      password,
-      user.passwordSalt,
-      user.passwordHash
-    );
-
-    if (!valid) {
-      return res.status(401).json({
-        error:
-          "Incorrect phone number or password."
-      });
-    }
-
-    res.json(
-      safeUser(user)
-    );
-
-  } catch (error) {
-    console.error(
-      "LOGIN ERROR:",
-      error
-    );
-
-    res.status(500).json({
-      error: "Login failed."
-    });
   }
-});
+);
+
 
 /* =========================
    USERS
 ========================= */
 
-app.get("/api/users", (req, res) => {
-  const data = db();
+app.get(
+  "/api/users",
+  (req, res) => {
 
-  res.json(
-    data.users.map(safeUser)
-  );
-});
+    try {
+
+      const data = db();
+
+      res.json(
+        data.users.map(
+          safeUser
+        )
+      );
+
+    } catch (error) {
+
+      console.error(
+        "USERS ERROR:",
+        error
+      );
+
+      res.status(500).json({
+        error:
+          "Unable to load users."
+      });
+    }
+  }
+);
+
 
 /* =========================
-   EDIT PROFILE / USERNAME
+   EDIT PROFILE
 ========================= */
 
 app.put(
   "/api/profile",
   (req, res) => {
-    try {
-      const id = String(
-        req.body.id || ""
-      ).trim();
 
-      const username = String(
-        req.body.username || ""
-      ).trim();
+    try {
+
+      const id =
+        String(
+          req.body.id || ""
+        ).trim();
+
+      const username =
+        String(
+          req.body.username || ""
+        ).trim();
 
       const avatar =
         req.body.avatar
-          ? String(req.body.avatar)
+          ? String(
+              req.body.avatar
+            )
           : null;
 
       if (!id) {
+
         return res.status(400).json({
           error:
             "User ID is required."
@@ -388,20 +761,27 @@ app.put(
       }
 
       if (!username) {
+
         return res.status(400).json({
           error:
             "Name is required."
         });
       }
 
-      if (username.length < 2) {
+      if (
+        username.length < 2
+      ) {
+
         return res.status(400).json({
           error:
             "Name must be at least 2 characters."
         });
       }
 
-      if (username.length > 30) {
+      if (
+        username.length > 30
+      ) {
+
         return res.status(400).json({
           error:
             "Name must be 30 characters or less."
@@ -412,23 +792,35 @@ app.put(
 
       const user =
         data.users.find(
-          item => item.id === id
+          item =>
+            item.id === id
         );
 
       if (!user) {
+
         return res.status(404).json({
           error:
             "User not found."
         });
       }
 
-      user.username = username;
+      /*
+        IMPORTANT:
+        user.id is NEVER changed.
+      */
+
+      user.username =
+        username;
 
       if (
         avatar === null ||
-        avatar.startsWith("/uploads/")
+        avatar.startsWith(
+          "/uploads/"
+        )
       ) {
-        user.avatar = avatar;
+
+        user.avatar =
+          avatar;
       }
 
       save(data);
@@ -446,6 +838,7 @@ app.put(
       res.json(updated);
 
     } catch (error) {
+
       console.error(
         "PROFILE UPDATE ERROR:",
         error
@@ -453,26 +846,31 @@ app.put(
 
       res.status(500).json({
         error:
-          "Profile update failed."
+          "Profile update failed. Existing account data was not reset."
       });
     }
   }
 );
 
+
 /* =========================
-   PROFILE PHOTO UPLOAD
+   PROFILE PHOTO
 ========================= */
 
 app.post(
   "/api/profile/avatar",
   upload.single("avatar"),
   (req, res) => {
+
     try {
-      const id = String(
-        req.body.id || ""
-      ).trim();
+
+      const id =
+        String(
+          req.body.id || ""
+        ).trim();
 
       if (!id) {
+
         return res.status(400).json({
           error:
             "User ID is required."
@@ -480,6 +878,7 @@ app.post(
       }
 
       if (!req.file) {
+
         return res.status(400).json({
           error:
             "No profile photo selected."
@@ -491,6 +890,7 @@ app.post(
           "image/"
         )
       ) {
+
         try {
           fs.unlinkSync(
             req.file.path
@@ -507,10 +907,12 @@ app.post(
 
       const user =
         data.users.find(
-          item => item.id === id
+          item =>
+            item.id === id
         );
 
       if (!user) {
+
         try {
           fs.unlinkSync(
             req.file.path
@@ -527,7 +929,13 @@ app.post(
         "/uploads/" +
         req.file.filename;
 
-      user.avatar = avatarUrl;
+      /*
+        Only avatar changes.
+        User ID remains untouched.
+      */
+
+      user.avatar =
+        avatarUrl;
 
       save(data);
 
@@ -542,11 +950,15 @@ app.post(
       broadcastUsers();
 
       res.json({
-        avatar: avatarUrl,
-        user: updated
+        avatar:
+          avatarUrl,
+
+        user:
+          updated
       });
 
     } catch (error) {
+
       console.error(
         "AVATAR UPLOAD ERROR:",
         error
@@ -560,6 +972,7 @@ app.post(
   }
 );
 
+
 /* =========================
    MESSAGES
 ========================= */
@@ -567,31 +980,48 @@ app.post(
 app.get(
   "/api/messages/:a/:b",
   (req, res) => {
-    const data = db();
 
-    const {
-      a,
-      b
-    } = req.params;
+    try {
 
-    const messages =
-      data.messages.filter(
-        message =>
-          (
-            message.from === a &&
-            message.to === b
-          ) ||
-          (
-            message.from === b &&
-            message.to === a
-          )
+      const data = db();
+
+      const {
+        a,
+        b
+      } = req.params;
+
+      const messages =
+        data.messages.filter(
+          message =>
+            (
+              message.from === a &&
+              message.to === b
+            ) ||
+            (
+              message.from === b &&
+              message.to === a
+            )
+        );
+
+      res.json(
+        messages.slice(-200)
       );
 
-    res.json(
-      messages.slice(-200)
-    );
+    } catch (error) {
+
+      console.error(
+        "MESSAGES ERROR:",
+        error
+      );
+
+      res.status(500).json({
+        error:
+          "Unable to load messages."
+      });
+    }
   }
 );
+
 
 /* =========================
    FILE UPLOAD
@@ -601,8 +1031,11 @@ app.post(
   "/api/upload",
   upload.single("file"),
   (req, res) => {
+
     try {
+
       if (!req.file) {
+
         return res.status(400).json({
           error:
             "No file uploaded."
@@ -610,6 +1043,7 @@ app.post(
       }
 
       res.json({
+
         url:
           "/uploads/" +
           req.file.filename,
@@ -625,6 +1059,7 @@ app.post(
       });
 
     } catch (error) {
+
       console.error(
         "FILE UPLOAD ERROR:",
         error
@@ -638,18 +1073,35 @@ app.post(
   }
 );
 
+
 /* =========================
    ONLINE USERS
 ========================= */
 
-const online = new Map();
+const online =
+  new Map();
+
 
 function broadcastUsers() {
-  io.emit(
-    "users:update",
-    db().users.map(safeUser)
-  );
+
+  try {
+
+    io.emit(
+      "users:update",
+      db().users.map(
+        safeUser
+      )
+    );
+
+  } catch (error) {
+
+    console.error(
+      "BROADCAST USERS ERROR:",
+      error
+    );
+  }
 }
+
 
 /* =========================
    SOCKET.IO
@@ -667,49 +1119,84 @@ io.on(
       "join",
       user => {
 
-        if (!user?.id) return;
+        try {
 
-        const data = db();
+          if (!user?.id) {
+            return;
+          }
 
-        const realUser =
-          data.users.find(
-            u => u.id === user.id
+          const data = db();
+
+          const realUser =
+            data.users.find(
+              u =>
+                u.id === user.id
+            );
+
+          /*
+            Never trust a locally stored
+            username/avatar.
+
+            ID is checked against server DB.
+          */
+
+          if (!realUser) {
+            return;
+          }
+
+          socket.user =
+            safeUser(
+              realUser
+            );
+
+          if (
+            !online.has(
+              realUser.id
+            )
+          ) {
+
+            online.set(
+              realUser.id,
+              new Set()
+            );
+          }
+
+          online
+            .get(
+              realUser.id
+            )
+            .add(
+              socket.id
+            );
+
+          socket.join(
+            "user:" +
+            realUser.id
           );
 
-        if (!realUser) return;
+          io.emit(
+            "presence",
+            {
+              userId:
+                realUser.id,
 
-        socket.user =
-          safeUser(realUser);
+              online:
+                true
+            }
+          );
 
-        if (!online.has(realUser.id)) {
-          online.set(
-            realUser.id,
-            new Set()
+          broadcastUsers();
+
+        } catch (error) {
+
+          console.error(
+            "JOIN ERROR:",
+            error
           );
         }
-
-        online
-          .get(realUser.id)
-          .add(socket.id);
-
-        socket.join(
-          "user:" +
-          realUser.id
-        );
-
-        io.emit(
-          "presence",
-          {
-            userId:
-              realUser.id,
-
-            online: true
-          }
-        );
-
-        broadcastUsers();
       }
     );
+
 
     /* =====================
        MESSAGE
@@ -719,66 +1206,93 @@ io.on(
       "message",
       msg => {
 
-        if (
-          !socket.user ||
-          !msg?.to
-        ) {
-          return;
-        }
+        try {
 
-        const data = db();
+          if (
+            !socket.user ||
+            !msg?.to
+          ) {
+            return;
+          }
 
-        const recipient =
-          data.users.find(
-            u => u.id === msg.to
+          const data = db();
+
+          const sender =
+            data.users.find(
+              u =>
+                u.id ===
+                socket.user.id
+            );
+
+          const recipient =
+            data.users.find(
+              u =>
+                u.id === msg.to
+            );
+
+          if (
+            !sender ||
+            !recipient
+          ) {
+            return;
+          }
+
+          const message = {
+
+            id:
+              createMessageId(),
+
+            from:
+              sender.id,
+
+            to:
+              recipient.id,
+
+            type:
+              msg.type ||
+              "text",
+
+            text:
+              msg.text || "",
+
+            file:
+              msg.file || null,
+
+            time:
+              Date.now()
+          };
+
+          data.messages.push(
+            message
           );
 
-        if (!recipient) return;
+          save(data);
 
-        const message = {
-          id: createId(),
+          io
+            .to(
+              "user:" +
+              recipient.id
+            )
+            .emit(
+              "message",
+              message
+            );
 
-          from:
-            socket.user.id,
-
-          to:
-            recipient.id,
-
-          type:
-            msg.type || "text",
-
-          text:
-            msg.text || "",
-
-          file:
-            msg.file || null,
-
-          time:
-            Date.now()
-        };
-
-        data.messages.push(
-          message
-        );
-
-        save(data);
-
-        io
-          .to(
-            "user:" +
-            recipient.id
-          )
-          .emit(
+          socket.emit(
             "message",
             message
           );
 
-        socket.emit(
-          "message",
-          message
-        );
+        } catch (error) {
+
+          console.error(
+            "MESSAGE ERROR:",
+            error
+          );
+        }
       }
     );
+
 
     /* =====================
        TYPING
@@ -813,8 +1327,9 @@ io.on(
       }
     );
 
+
     /* =====================
-       WEBRTC CALL OFFER
+       CALL OFFER
     ===================== */
 
     socket.on(
@@ -849,8 +1364,9 @@ io.on(
       }
     );
 
+
     /* =====================
-       WEBRTC CALL ANSWER
+       CALL ANSWER
     ===================== */
 
     socket.on(
@@ -882,8 +1398,9 @@ io.on(
       }
     );
 
+
     /* =====================
-       WEBRTC ICE
+       ICE
     ===================== */
 
     socket.on(
@@ -915,6 +1432,7 @@ io.on(
       }
     );
 
+
     /* =====================
        END CALL
     ===================== */
@@ -945,6 +1463,7 @@ io.on(
       }
     );
 
+
     /* =====================
        PROFILE UPDATE
     ===================== */
@@ -953,48 +1472,70 @@ io.on(
       "profile:update",
       data => {
 
-        if (!socket.user) return;
+        try {
 
-        const id =
-          socket.user.id;
+          if (!socket.user) {
+            return;
+          }
 
-        const username =
-          String(
-            data?.username || ""
-          ).trim();
+          const id =
+            socket.user.id;
 
-        if (
-          username.length < 2 ||
-          username.length > 30
-        ) {
-          return;
-        }
+          const username =
+            String(
+              data?.username || ""
+            ).trim();
 
-        const database = db();
+          if (
+            username.length < 2 ||
+            username.length > 30
+          ) {
+            return;
+          }
 
-        const user =
-          database.users.find(
-            item => item.id === id
+          const database =
+            db();
+
+          const user =
+            database.users.find(
+              item =>
+                item.id === id
+            );
+
+          if (!user) {
+            return;
+          }
+
+          /*
+            Only username changes.
+            ID remains permanent.
+          */
+
+          user.username =
+            username;
+
+          save(database);
+
+          socket.user =
+            safeUser(user);
+
+          io.emit(
+            "profile:update",
+            socket.user
           );
 
-        if (!user) return;
+          broadcastUsers();
 
-        user.username =
-          username;
+        } catch (error) {
 
-        save(database);
-
-        socket.user =
-          safeUser(user);
-
-        io.emit(
-          "profile:update",
-          socket.user
-        );
-
-        broadcastUsers();
+          console.error(
+            "SOCKET PROFILE UPDATE ERROR:",
+            error
+          );
+        }
       }
     );
+
 
     /* =====================
        DISCONNECT
@@ -1012,7 +1553,9 @@ io.on(
           socket.user.id;
 
         const set =
-          online.get(userId);
+          online.get(
+            userId
+          );
 
         if (!set) {
           return;
@@ -1033,7 +1576,8 @@ io.on(
             {
               userId,
 
-              online: false
+              online:
+                false
             }
           );
         }
@@ -1044,6 +1588,7 @@ io.on(
   }
 );
 
+
 /* =========================
    START SERVER
 ========================= */
@@ -1052,8 +1597,17 @@ server.listen(
   PORT,
   "0.0.0.0",
   () => {
+
     console.log(
       `MATRYX CHAT running on port ${PORT}`
+    );
+
+    console.log(
+      `Database: ${dbFile}`
+    );
+
+    console.log(
+      `Database backup: ${backupFile}`
     );
   }
 );

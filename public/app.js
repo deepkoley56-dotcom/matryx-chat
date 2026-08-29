@@ -1,9 +1,11 @@
 /* =========================================================
    MATRYX CHAT - APP.JS
-   Username Edit + Profile + Chat + Calls
+   Permanent User ID + Safe Account Persistence
+   Username + Profile + Chat + Calls
 ========================================================= */
 
 const socket = io();
+
 
 /* =========================
    STATE
@@ -19,45 +21,91 @@ let currentCallUser = null;
 let currentCallVideo = false;
 let isMuted = false;
 
+const onlineUsers = new Set();
+
 const rtcConfig = {
   iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" }
+    {
+      urls:
+        "stun:stun.l.google.com:19302"
+    },
+    {
+      urls:
+        "stun:stun1.l.google.com:19302"
+    }
   ]
 };
+
 
 /* =========================
    ELEMENTS
 ========================= */
 
-const authScreen = document.getElementById("auth");
-const appScreen = document.getElementById("app");
+const authScreen =
+  document.getElementById("auth");
 
-const phoneInput = document.getElementById("phone");
-const passwordInput = document.getElementById("password");
-const authMsg = document.getElementById("authMsg");
+const appScreen =
+  document.getElementById("app");
 
-const meEl = document.getElementById("me");
-const myAvatar = document.getElementById("myAvatar");
+const phoneInput =
+  document.getElementById("phone");
 
-const usersEl = document.getElementById("users");
-const searchInput = document.getElementById("search");
-const contactCount = document.getElementById("contactCount");
+const passwordInput =
+  document.getElementById("password");
 
-const chatName = document.getElementById("chatName");
-const chatAvatar = document.getElementById("chatAvatar");
-const statusEl = document.getElementById("status");
-const typingEl = document.getElementById("typing");
+const authMsg =
+  document.getElementById("authMsg");
 
-const messagesEl = document.getElementById("messages");
-const composer = document.getElementById("composer");
-const textInput = document.getElementById("text");
-const fileInput = document.getElementById("file");
+const meEl =
+  document.getElementById("me");
 
-const callScreen = document.getElementById("call");
-const callTitle = document.getElementById("callTitle");
-const remoteVideo = document.getElementById("remoteVideo");
-const localVideo = document.getElementById("localVideo");
+const myAvatar =
+  document.getElementById("myAvatar");
+
+const usersEl =
+  document.getElementById("users");
+
+const searchInput =
+  document.getElementById("search");
+
+const contactCount =
+  document.getElementById("contactCount");
+
+const chatName =
+  document.getElementById("chatName");
+
+const chatAvatar =
+  document.getElementById("chatAvatar");
+
+const statusEl =
+  document.getElementById("status");
+
+const typingEl =
+  document.getElementById("typing");
+
+const messagesEl =
+  document.getElementById("messages");
+
+const composer =
+  document.getElementById("composer");
+
+const textInput =
+  document.getElementById("text");
+
+const fileInput =
+  document.getElementById("file");
+
+const callScreen =
+  document.getElementById("call");
+
+const callTitle =
+  document.getElementById("callTitle");
+
+const remoteVideo =
+  document.getElementById("remoteVideo");
+
+const localVideo =
+  document.getElementById("localVideo");
 
 
 /* =========================
@@ -65,36 +113,77 @@ const localVideo = document.getElementById("localVideo");
 ========================= */
 
 function saveMe() {
-  if (me) {
-    localStorage.setItem(
-      "matryx_me",
-      JSON.stringify(me)
-    );
+
+  if (
+    !me ||
+    !me.id
+  ) {
+    return;
   }
+
+  /*
+    The server-created ID is saved
+    locally.
+
+    It is never regenerated here.
+  */
+
+  localStorage.setItem(
+    "matryx_me",
+    JSON.stringify(me)
+  );
 }
 
+
 function loadMe() {
+
   try {
+
     const saved =
       JSON.parse(
-        localStorage.getItem("matryx_me") || "null"
+        localStorage.getItem(
+          "matryx_me"
+        ) || "null"
       );
 
     if (
       saved &&
       saved.id &&
-      saved.username
+      saved.username &&
+      saved.phone
     ) {
+
       me = saved;
+
       return true;
     }
-  } catch {}
+
+  } catch (error) {
+
+    console.error(
+      "LOCAL ACCOUNT LOAD ERROR:",
+      error
+    );
+  }
 
   return false;
 }
 
+
 function clearMe() {
-  localStorage.removeItem("matryx_me");
+
+  /*
+    Logout removes only the local
+    login state.
+
+    It does NOT delete the server
+    account.
+  */
+
+  localStorage.removeItem(
+    "matryx_me"
+  );
+
   me = null;
 }
 
@@ -104,29 +193,48 @@ function clearMe() {
 ========================= */
 
 function showAuth() {
+
   if (authScreen) {
-    authScreen.classList.remove("hidden");
+    authScreen.classList.remove(
+      "hidden"
+    );
   }
 
   if (appScreen) {
-    appScreen.classList.add("hidden");
+    appScreen.classList.add(
+      "hidden"
+    );
   }
 }
 
+
 function showApp() {
+
   if (authScreen) {
-    authScreen.classList.add("hidden");
+    authScreen.classList.add(
+      "hidden"
+    );
   }
 
   if (appScreen) {
-    appScreen.classList.remove("hidden");
+    appScreen.classList.remove(
+      "hidden"
+    );
   }
 
   updateProfileUI();
+
   renderUsers();
 
-  if (me) {
-    socket.emit("join", me);
+  if (me?.id) {
+
+    socket.emit(
+      "join",
+      {
+        id:
+          me.id
+      }
+    );
   }
 }
 
@@ -137,7 +245,10 @@ function showApp() {
 
 async function auth(type) {
 
-  if (!phoneInput || !passwordInput) {
+  if (
+    !phoneInput ||
+    !passwordInput
+  ) {
     return;
   }
 
@@ -147,10 +258,15 @@ async function auth(type) {
   const password =
     passwordInput.value;
 
-  if (!phone || !password) {
+  if (
+    !phone ||
+    !password
+  ) {
+
     setAuthMessage(
       "Phone number and password are required."
     );
+
     return;
   }
 
@@ -168,17 +284,19 @@ async function auth(type) {
           ? "/api/login"
           : "/api/register",
         {
-          method: "POST",
+          method:
+            "POST",
 
           headers: {
             "Content-Type":
               "application/json"
           },
 
-          body: JSON.stringify({
-            phone,
-            password
-          })
+          body:
+            JSON.stringify({
+              phone,
+              password
+            })
         }
       );
 
@@ -186,14 +304,51 @@ async function auth(type) {
       await response.json();
 
     if (!response.ok) {
+
       setAuthMessage(
         data.error ||
         "Something went wrong."
       );
+
       return;
     }
 
-    me = data;
+    /*
+      IMPORTANT:
+
+      Always replace local account data
+      with the server response.
+
+      The ID returned by server is the
+      permanent User ID.
+    */
+
+    if (
+      !data.id ||
+      !data.username ||
+      !data.phone
+    ) {
+
+      setAuthMessage(
+        "Invalid account data received from server."
+      );
+
+      return;
+    }
+
+    me = {
+      id:
+        data.id,
+
+      username:
+        data.username,
+
+      phone:
+        data.phone,
+
+      avatar:
+        data.avatar || null
+    };
 
     saveMe();
 
@@ -201,9 +356,14 @@ async function auth(type) {
 
     showApp();
 
+    await loadUsers();
+
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "AUTH ERROR:",
+      error
+    );
 
     setAuthMessage(
       "Server connection failed."
@@ -211,8 +371,13 @@ async function auth(type) {
   }
 }
 
-function setAuthMessage(message) {
+
+function setAuthMessage(
+  message
+) {
+
   if (authMsg) {
+
     authMsg.textContent =
       message || "";
   }
@@ -227,11 +392,22 @@ function logout() {
 
   endCall();
 
+  /*
+    Only local session is removed.
+
+    Server account remains permanently
+    stored in database.
+  */
+
   clearMe();
 
-  selectedUser = null;
+  selectedUser =
+    null;
+
+  onlineUsers.clear();
 
   if (messagesEl) {
+
     messagesEl.innerHTML = `
       <div class="empty-chat">
         <div class="empty-logo">M</div>
@@ -251,11 +427,18 @@ function logout() {
 
 function updateProfileUI() {
 
-  if (!me) return;
+  if (!me) {
+    return;
+  }
 
   if (meEl) {
+
     meEl.textContent =
-      "@" + me.username;
+      "@" +
+      (
+        me.username ||
+        "user"
+      );
   }
 
   updateAvatarElement(
@@ -265,13 +448,16 @@ function updateProfileUI() {
   );
 }
 
+
 function updateAvatarElement(
   element,
   username,
   avatar
 ) {
 
-  if (!element) return;
+  if (!element) {
+    return;
+  }
 
   if (avatar) {
 
@@ -284,7 +470,8 @@ function updateAvatarElement(
     element.style.backgroundPosition =
       "center";
 
-    element.textContent = "";
+    element.textContent =
+      "";
 
   } else {
 
@@ -292,7 +479,9 @@ function updateAvatarElement(
       "";
 
     element.textContent =
-      String(username || "M")
+      String(
+        username || "M"
+      )
         .charAt(0)
         .toUpperCase();
   }
@@ -305,7 +494,7 @@ function updateAvatarElement(
 
 async function editUsername() {
 
-  if (!me) {
+  if (!me?.id) {
     return;
   }
 
@@ -318,7 +507,9 @@ async function editUsername() {
       current
     );
 
-  if (newName === null) {
+  if (
+    newName === null
+  ) {
     return;
   }
 
@@ -326,71 +517,39 @@ async function editUsername() {
     newName.trim();
 
   if (!username) {
-    alert("Name cannot be empty.");
-    return;
-  }
-
-  if (username.length < 2) {
-    alert("Name must be at least 2 characters.");
-    return;
-  }
-
-  if (username.length > 30) {
-    alert("Name must be 30 characters or less.");
-    return;
-  }
-
-  try {
-
-    const response =
-      await fetch(
-        "/api/profile",
-        {
-          method: "PUT",
-
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-
-          body: JSON.stringify({
-            id: me.id,
-            username
-          })
-        }
-      );
-
-    const data =
-      await response.json();
-
-    if (!response.ok) {
-      alert(
-        data.error ||
-        "Name update failed."
-      );
-      return;
-    }
-
-    me = data;
-
-    saveMe();
-
-    updateProfileUI();
-
-    renderUsers();
-
-    updateSelectedUser();
-
-    alert("Name updated successfully.");
-
-  } catch (error) {
-
-    console.error(error);
 
     alert(
-      "Unable to update name."
+      "Name cannot be empty."
     );
+
+    return;
   }
+
+  if (
+    username.length < 2
+  ) {
+
+    alert(
+      "Name must be at least 2 characters."
+    );
+
+    return;
+  }
+
+  if (
+    username.length > 30
+  ) {
+
+    alert(
+      "Name must be 30 characters or less."
+    );
+
+    return;
+  }
+
+  await updateUsernameDirect(
+    username
+  );
 }
 
 
@@ -398,14 +557,27 @@ async function editUsername() {
    PROFILE PHOTO
 ========================= */
 
-async function uploadAvatar(file) {
+async function uploadAvatar(
+  file
+) {
 
-  if (!me || !file) {
+  if (
+    !me?.id ||
+    !file
+  ) {
     return;
   }
 
-  if (!file.type.startsWith("image/")) {
-    alert("Please select an image.");
+  if (
+    !file.type.startsWith(
+      "image/"
+    )
+  ) {
+
+    alert(
+      "Please select an image."
+    );
+
     return;
   }
 
@@ -416,6 +588,10 @@ async function uploadAvatar(file) {
     "avatar",
     file
   );
+
+  /*
+    Permanent User ID is sent.
+  */
 
   formData.append(
     "id",
@@ -428,8 +604,11 @@ async function uploadAvatar(file) {
       await fetch(
         "/api/profile/avatar",
         {
-          method: "POST",
-          body: formData
+          method:
+            "POST",
+
+          body:
+            formData
         }
       );
 
@@ -437,18 +616,35 @@ async function uploadAvatar(file) {
       await response.json();
 
     if (!response.ok) {
+
       alert(
         data.error ||
         "Profile photo upload failed."
       );
+
       return;
     }
 
-    me =
-      data.user || {
-        ...me,
-        avatar: data.avatar
-      };
+    if (
+      data.user?.id !== me.id
+    ) {
+
+      alert(
+        "Server returned an invalid User ID."
+      );
+
+      return;
+    }
+
+    /*
+      Keep the same permanent ID.
+    */
+
+    me = {
+      ...me,
+      ...data.user,
+      id: me.id
+    };
 
     saveMe();
 
@@ -460,7 +656,10 @@ async function uploadAvatar(file) {
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "AVATAR ERROR:",
+      error
+    );
 
     alert(
       "Profile photo upload failed."
@@ -478,18 +677,31 @@ async function loadUsers() {
   try {
 
     const response =
-      await fetch("/api/users");
+      await fetch(
+        "/api/users"
+      );
 
     if (!response.ok) {
-      return;
+      return false;
+    }
+
+    const list =
+      await response.json();
+
+    if (
+      !Array.isArray(list)
+    ) {
+      return false;
     }
 
     users =
-      await response.json();
+      list;
 
     renderUsers();
 
     updateSelectedUser();
+
+    return true;
 
   } catch (error) {
 
@@ -497,12 +709,17 @@ async function loadUsers() {
       "USERS ERROR:",
       error
     );
+
+    return false;
   }
 }
 
+
 function renderUsers() {
 
-  if (!usersEl) return;
+  if (!usersEl) {
+    return;
+  }
 
   const query =
     searchInput
@@ -512,31 +729,39 @@ function renderUsers() {
       : "";
 
   const filtered =
-    users.filter(user => {
+    users.filter(
+      user => {
 
-      if (!me) return false;
+        if (!me) {
+          return false;
+        }
 
-      if (user.id === me.id) {
-        return false;
+        if (
+          user.id === me.id
+        ) {
+          return false;
+        }
+
+        if (!query) {
+          return true;
+        }
+
+        return String(
+          user.username || ""
+        )
+          .toLowerCase()
+          .includes(query);
       }
-
-      if (!query) {
-        return true;
-      }
-
-      return String(
-        user.username || ""
-      )
-        .toLowerCase()
-        .includes(query);
-    });
+    );
 
   if (contactCount) {
+
     contactCount.textContent =
       filtered.length;
   }
 
-  usersEl.innerHTML = "";
+  usersEl.innerHTML =
+    "";
 
   if (!filtered.length) {
 
@@ -554,62 +779,77 @@ function renderUsers() {
     return;
   }
 
-  filtered.forEach(user => {
+  filtered.forEach(
+    user => {
 
-    const item =
-      document.createElement("div");
+      const item =
+        document.createElement(
+          "div"
+        );
 
-    item.className =
-      "user" +
-      (
-        selectedUser &&
-        selectedUser.id === user.id
-          ? " active"
-          : ""
+      item.className =
+        "user" +
+        (
+          selectedUser &&
+          selectedUser.id === user.id
+            ? " active"
+            : ""
+        );
+
+      item.dataset.id =
+        user.id;
+
+      item.innerHTML = `
+        <b></b>
+        <small>@${escapeHtml(
+          user.username ||
+          "User"
+        )}</small>
+        <span class="online"></span>
+      `;
+
+      const nameElement =
+        item.querySelector(
+          "b"
+        );
+
+      nameElement.textContent =
+        user.username ||
+        "User";
+
+      const onlineDot =
+        item.querySelector(
+          ".online"
+        );
+
+      if (
+        onlineUsers.has(
+          user.id
+        )
+      ) {
+
+        onlineDot.classList.add(
+          "on"
+        );
+      }
+
+      item.addEventListener(
+        "click",
+        () =>
+          selectUser(user)
       );
 
-    item.dataset.id =
-      user.id;
-
-    item.innerHTML = `
-      <b></b>
-      <small>@${escapeHtml(
-        user.username || "User"
-      )}</small>
-      <span class="online"></span>
-    `;
-
-    const nameElement =
-      item.querySelector("b");
-
-    nameElement.textContent =
-      user.username || "User";
-
-    const onlineDot =
-      item.querySelector(".online");
-
-    if (
-      onlineUsers.has(user.id)
-    ) {
-      onlineDot.classList.add("on");
+      usersEl.appendChild(
+        item
+      );
     }
-
-    item.addEventListener(
-      "click",
-      () => selectUser(user)
-    );
-
-    usersEl.appendChild(item);
-  });
+  );
 }
 
 
 /* =========================
    ONLINE USERS
 ========================= */
-
-const onlineUsers =
-  new Set();
 
 socket.on(
   "presence",
@@ -620,10 +860,13 @@ socket.on(
     }
 
     if (data.online) {
+
       onlineUsers.add(
         data.userId
       );
+
     } else {
+
       onlineUsers.delete(
         data.userId
       );
@@ -637,7 +880,7 @@ socket.on(
 
 
 /* =========================
-   PROFILE UPDATE SOCKET
+   PROFILE SOCKET UPDATE
 ========================= */
 
 socket.on(
@@ -651,27 +894,45 @@ socket.on(
     const index =
       users.findIndex(
         user =>
-          user.id === updated.id
+          user.id ===
+          updated.id
       );
 
     if (index !== -1) {
-      users[index] = updated;
+
+      users[index] =
+        updated;
     }
 
     if (
       me &&
       updated.id === me.id
     ) {
-      me = updated;
+
+      /*
+        ID stays exactly the same.
+      */
+
+      me = {
+        ...me,
+        ...updated,
+        id: me.id
+      };
+
       saveMe();
+
       updateProfileUI();
     }
 
     if (
       selectedUser &&
-      updated.id === selectedUser.id
+      updated.id ===
+        selectedUser.id
     ) {
-      selectedUser = updated;
+
+      selectedUser =
+        updated;
+
       updateSelectedUser();
     }
 
@@ -684,13 +945,19 @@ socket.on(
    SELECT USER
 ========================= */
 
-async function selectUser(user) {
+async function selectUser(
+  user
+) {
 
-  if (!user || !me) {
+  if (
+    !user ||
+    !me?.id
+  ) {
     return;
   }
 
-  selectedUser = user;
+  selectedUser =
+    user;
 
   updateSelectedUser();
 
@@ -699,6 +966,7 @@ async function selectUser(user) {
   await loadMessages();
 }
 
+
 function updateSelectedUser() {
 
   if (!selectedUser) {
@@ -706,6 +974,7 @@ function updateSelectedUser() {
   }
 
   if (chatName) {
+
     chatName.textContent =
       selectedUser.username ||
       "User";
@@ -736,8 +1005,8 @@ function updateSelectedUser() {
 async function loadMessages() {
 
   if (
-    !me ||
-    !selectedUser ||
+    !me?.id ||
+    !selectedUser?.id ||
     !messagesEl
   ) {
     return;
@@ -761,7 +1030,15 @@ async function loadMessages() {
     const messages =
       await response.json();
 
-    renderMessages(messages);
+    if (
+      !Array.isArray(messages)
+    ) {
+      return;
+    }
+
+    renderMessages(
+      messages
+    );
 
   } catch (error) {
 
@@ -772,13 +1049,17 @@ async function loadMessages() {
   }
 }
 
-function renderMessages(messages) {
+
+function renderMessages(
+  messages
+) {
 
   if (!messagesEl) {
     return;
   }
 
-  messagesEl.innerHTML = "";
+  messagesEl.innerHTML =
+    "";
 
   if (!messages.length) {
 
@@ -800,14 +1081,22 @@ function renderMessages(messages) {
   scrollMessages();
 }
 
-function renderMessage(message) {
 
-  if (!messagesEl || !message) {
+function renderMessage(
+  message
+) {
+
+  if (
+    !messagesEl ||
+    !message
+  ) {
     return;
   }
 
   const bubble =
-    document.createElement("div");
+    document.createElement(
+      "div"
+    );
 
   bubble.className =
     "bubble" +
@@ -818,33 +1107,48 @@ function renderMessage(message) {
         : ""
     );
 
-  if (message.type === "image") {
+  if (
+    message.type ===
+    "image"
+  ) {
 
-    if (message.file?.url) {
+    if (
+      message.file?.url
+    ) {
 
       const img =
-        document.createElement("img");
+        document.createElement(
+          "img"
+        );
 
       img.src =
         message.file.url;
 
       img.alt =
-        message.file.name || "Image";
+        message.file.name ||
+        "Image";
 
       img.loading =
         "lazy";
 
-      bubble.appendChild(img);
+      bubble.appendChild(
+        img
+      );
     }
 
   } else if (
-    message.type === "video"
+    message.type ===
+    "video"
   ) {
 
-    if (message.file?.url) {
+    if (
+      message.file?.url
+    ) {
 
       const video =
-        document.createElement("video");
+        document.createElement(
+          "video"
+        );
 
       video.src =
         message.file.url;
@@ -855,17 +1159,24 @@ function renderMessage(message) {
       video.playsInline =
         true;
 
-      bubble.appendChild(video);
+      bubble.appendChild(
+        video
+      );
     }
 
   } else if (
-    message.type === "file"
+    message.type ===
+    "file"
   ) {
 
-    if (message.file?.url) {
+    if (
+      message.file?.url
+    ) {
 
       const link =
-        document.createElement("a");
+        document.createElement(
+          "a"
+        );
 
       link.href =
         message.file.url;
@@ -883,37 +1194,52 @@ function renderMessage(message) {
           "Open file"
         );
 
-      bubble.appendChild(link);
+      bubble.appendChild(
+        link
+      );
     }
 
   } else {
 
     const text =
-      document.createElement("div");
+      document.createElement(
+        "div"
+      );
 
     text.textContent =
       message.text || "";
 
-    bubble.appendChild(text);
+    bubble.appendChild(
+      text
+    );
   }
 
   const time =
-    document.createElement("div");
+    document.createElement(
+      "div"
+    );
 
   time.className =
     "time";
 
   time.textContent =
-    formatTime(message.time);
+    formatTime(
+      message.time
+    );
 
-  bubble.appendChild(time);
+  bubble.appendChild(
+    time
+  );
 
   messagesEl.appendChild(
     bubble
   );
 }
 
-function formatTime(timestamp) {
+
+function formatTime(
+  timestamp
+) {
 
   if (!timestamp) {
     return "";
@@ -926,8 +1252,11 @@ function formatTime(timestamp) {
     ).toLocaleTimeString(
       [],
       {
-        hour: "2-digit",
-        minute: "2-digit"
+        hour:
+          "2-digit",
+
+        minute:
+          "2-digit"
       }
     );
 
@@ -937,6 +1266,7 @@ function formatTime(timestamp) {
   }
 }
 
+
 function scrollMessages() {
 
   if (!messagesEl) {
@@ -945,6 +1275,7 @@ function scrollMessages() {
 
   requestAnimationFrame(
     () => {
+
       messagesEl.scrollTop =
         messagesEl.scrollHeight;
     }
@@ -965,8 +1296,8 @@ if (composer) {
       event.preventDefault();
 
       if (
-        !me ||
-        !selectedUser ||
+        !me?.id ||
+        !selectedUser?.id ||
         !textInput
       ) {
         return;
@@ -992,7 +1323,8 @@ if (composer) {
         }
       );
 
-      textInput.value = "";
+      textInput.value =
+        "";
 
       socket.emit(
         "typing",
@@ -1026,12 +1358,16 @@ socket.on(
       me &&
       (
         (
-          message.from === me.id &&
-          message.to === selectedUser.id
+          message.from ===
+            me.id &&
+          message.to ===
+            selectedUser.id
         ) ||
         (
-          message.from === selectedUser.id &&
-          message.to === me.id
+          message.from ===
+            selectedUser.id &&
+          message.to ===
+            me.id
         )
       )
     ) {
@@ -1042,10 +1378,13 @@ socket.on(
         );
 
       if (empty) {
-        messagesEl.innerHTML = "";
+        messagesEl.innerHTML =
+          "";
       }
 
-      renderMessage(message);
+      renderMessage(
+        message
+      );
 
       scrollMessages();
     }
@@ -1071,27 +1410,34 @@ if (fileInput) {
       }
 
       if (
-        !me ||
-        !selectedUser
+        !me?.id ||
+        !selectedUser?.id
       ) {
 
         alert(
           "Select a contact first."
         );
 
-        fileInput.value = "";
+        fileInput.value =
+          "";
 
         return;
       }
 
-      await sendFile(file);
+      await sendFile(
+        file
+      );
 
-      fileInput.value = "";
+      fileInput.value =
+        "";
     }
   );
 }
 
-async function sendFile(file) {
+
+async function sendFile(
+  file
+) {
 
   try {
 
@@ -1107,8 +1453,11 @@ async function sendFile(file) {
       await fetch(
         "/api/upload",
         {
-          method: "POST",
-          body: formData
+          method:
+            "POST",
+
+          body:
+            formData
         }
       );
 
@@ -1116,10 +1465,12 @@ async function sendFile(file) {
       await response.json();
 
     if (!response.ok) {
+
       alert(
         data.error ||
         "File upload failed."
       );
+
       return;
     }
 
@@ -1131,14 +1482,18 @@ async function sendFile(file) {
         "image/"
       )
     ) {
-      type = "image";
+
+      type =
+        "image";
 
     } else if (
       file.type.startsWith(
         "video/"
       )
     ) {
-      type = "video";
+
+      type =
+        "video";
     }
 
     socket.emit(
@@ -1170,7 +1525,10 @@ async function sendFile(file) {
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "FILE ERROR:",
+      error
+    );
 
     alert(
       "File upload failed."
@@ -1183,7 +1541,8 @@ async function sendFile(file) {
    TYPING
 ========================= */
 
-let typingTimer = null;
+let typingTimer =
+  null;
 
 if (textInput) {
 
@@ -1192,8 +1551,8 @@ if (textInput) {
     () => {
 
       if (
-        !selectedUser ||
-        !me
+        !selectedUser?.id ||
+        !me?.id
       ) {
         return;
       }
@@ -1235,6 +1594,7 @@ if (textInput) {
   );
 }
 
+
 socket.on(
   "typing",
   data => {
@@ -1268,7 +1628,9 @@ socket.on(
           typingEl &&
           data.active
         ) {
-          typingEl.textContent = "";
+
+          typingEl.textContent =
+            "";
         }
 
       },
@@ -1286,16 +1648,21 @@ socket.on(
   "connect",
   () => {
 
-    if (me) {
+    if (me?.id) {
+
       socket.emit(
         "join",
-        me
+        {
+          id:
+            me.id
+        }
       );
     }
 
     loadUsers();
   }
 );
+
 
 socket.on(
   "users:update",
@@ -1305,7 +1672,8 @@ socket.on(
       Array.isArray(list)
     ) {
 
-      users = list;
+      users =
+        list;
 
       renderUsers();
 
@@ -1319,11 +1687,13 @@ socket.on(
    CALLS
 ========================= */
 
-async function startCall(video) {
+async function startCall(
+  video
+) {
 
   if (
-    !me ||
-    !selectedUser
+    !me?.id ||
+    !selectedUser?.id
   ) {
 
     alert(
@@ -1343,17 +1713,20 @@ async function startCall(video) {
   currentCallVideo =
     !!video;
 
-  isMuted = false;
+  isMuted =
+    false;
 
   try {
 
     localStream =
-      await navigator.mediaDevices.getUserMedia(
-        {
-          audio: true,
-          video: !!video
-        }
-      );
+      await navigator.mediaDevices
+        .getUserMedia({
+          audio:
+            true,
+
+          video:
+            !!video
+        });
 
     openCallScreen(
       video,
@@ -1361,6 +1734,7 @@ async function startCall(video) {
     );
 
     if (localVideo) {
+
       localVideo.srcObject =
         localStream;
     }
@@ -1380,11 +1754,13 @@ async function startCall(video) {
       );
 
     const offer =
-      await peerConnection.createOffer();
+      await peerConnection
+        .createOffer();
 
-    await peerConnection.setLocalDescription(
-      offer
-    );
+    await peerConnection
+      .setLocalDescription(
+        offer
+      );
 
     socket.emit(
       "call:offer",
@@ -1464,6 +1840,7 @@ function createPeerConnection() {
           );
 
         if (placeholder) {
+
           placeholder.style.display =
             "none";
         }
@@ -1487,6 +1864,7 @@ function createPeerConnection() {
         state === "disconnected" ||
         state === "closed"
       ) {
+
         endCall();
       }
     };
@@ -1502,7 +1880,7 @@ socket.on(
   async data => {
 
     if (
-      !me ||
+      !me?.id ||
       !data?.from ||
       !data?.offer
     ) {
@@ -1512,7 +1890,8 @@ socket.on(
     const caller =
       users.find(
         user =>
-          user.id === data.from
+          user.id ===
+          data.from
       );
 
     const callerName =
@@ -1556,18 +1935,20 @@ socket.on(
     currentCallVideo =
       !!data.video;
 
-    isMuted = false;
+    isMuted =
+      false;
 
     try {
 
       localStream =
-        await navigator.mediaDevices.getUserMedia(
-          {
-            audio: true,
+        await navigator.mediaDevices
+          .getUserMedia({
+            audio:
+              true,
+
             video:
               !!data.video
-          }
-        );
+          });
 
       openCallScreen(
         !!data.video,
@@ -1575,6 +1956,7 @@ socket.on(
       );
 
       if (localVideo) {
+
         localVideo.srcObject =
           localStream;
       }
@@ -1593,18 +1975,21 @@ socket.on(
           }
         );
 
-      await peerConnection.setRemoteDescription(
-        new RTCSessionDescription(
-          data.offer
-        )
-      );
+      await peerConnection
+        .setRemoteDescription(
+          new RTCSessionDescription(
+            data.offer
+          )
+        );
 
       const answer =
-        await peerConnection.createAnswer();
+        await peerConnection
+          .createAnswer();
 
-      await peerConnection.setLocalDescription(
-        answer
-      );
+      await peerConnection
+        .setLocalDescription(
+          answer
+        );
 
       socket.emit(
         "call:answer",
@@ -1646,11 +2031,12 @@ socket.on(
 
     try {
 
-      await peerConnection.setRemoteDescription(
-        new RTCSessionDescription(
-          data.answer
-        )
-      );
+      await peerConnection
+        .setRemoteDescription(
+          new RTCSessionDescription(
+            data.answer
+          )
+        );
 
     } catch (error) {
 
@@ -1680,11 +2066,12 @@ socket.on(
 
     try {
 
-      await peerConnection.addIceCandidate(
-        new RTCIceCandidate(
-          data.candidate
-        )
-      );
+      await peerConnection
+        .addIceCandidate(
+          new RTCIceCandidate(
+            data.candidate
+          )
+        );
 
     } catch (error) {
 
@@ -1698,7 +2085,7 @@ socket.on(
 
 
 /* =========================
-   END CALL REMOTE
+   REMOTE END CALL
 ========================= */
 
 socket.on(
@@ -1730,6 +2117,7 @@ function openCallScreen(
   );
 
   if (callTitle) {
+
     callTitle.textContent =
       `${video ? "Video" : "Voice"} call • ${name || "User"}`;
   }
@@ -1805,11 +2193,13 @@ function endCall(
   }
 
   if (remoteVideo) {
+
     remoteVideo.srcObject =
       null;
   }
 
   if (localVideo) {
+
     localVideo.srcObject =
       null;
   }
@@ -1824,6 +2214,7 @@ function endCall(
     false;
 
   if (callScreen) {
+
     callScreen.classList.add(
       "hidden"
     );
@@ -1848,6 +2239,7 @@ function toggleMute() {
     .getAudioTracks()
     .forEach(
       track => {
+
         track.enabled =
           !isMuted;
       }
@@ -1859,9 +2251,13 @@ function toggleMute() {
    ESCAPE HTML
 ========================= */
 
-function escapeHtml(value) {
+function escapeHtml(
+  value
+) {
 
-  return String(value || "")
+  return String(
+    value || ""
+  )
     .replace(
       /&/g,
       "&amp;"
@@ -1882,6 +2278,112 @@ function escapeHtml(value) {
       /'/g,
       "&#039;"
     );
+}
+
+
+/* =========================
+   DIRECT USERNAME UPDATE
+========================= */
+
+async function updateUsernameDirect(
+  username
+) {
+
+  if (!me?.id) {
+    return;
+  }
+
+  if (
+    username.length < 2 ||
+    username.length > 30
+  ) {
+
+    alert(
+      "Name must be between 2 and 30 characters."
+    );
+
+    return;
+  }
+
+  try {
+
+    const response =
+      await fetch(
+        "/api/profile",
+        {
+          method:
+            "PUT",
+
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+
+          body:
+            JSON.stringify({
+              id:
+                me.id,
+
+              username
+            })
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+
+      alert(
+        data.error ||
+        "Unable to update name."
+      );
+
+      return;
+    }
+
+    /*
+      Never allow profile update to
+      replace the permanent local ID.
+    */
+
+    if (
+      data.id !== me.id
+    ) {
+
+      alert(
+        "Security error: User ID changed unexpectedly."
+      );
+
+      return;
+    }
+
+    me = {
+      ...me,
+      ...data,
+      id:
+        me.id
+    };
+
+    saveMe();
+
+    updateProfileUI();
+
+    renderUsers();
+
+    updateSelectedUser();
+
+  } catch (error) {
+
+    console.error(
+      "USERNAME UPDATE ERROR:",
+      error
+    );
+
+    alert(
+      "Profile update failed."
+    );
+  }
 }
 
 
@@ -1932,6 +2434,7 @@ if (meEl) {
   );
 }
 
+
 if (myAvatar) {
 
   myAvatar.style.cursor =
@@ -1942,108 +2445,8 @@ if (myAvatar) {
 
   myAvatar.addEventListener(
     "click",
-    () => {
-
-      const choice =
-        window.prompt(
-          "Type your new name.\n\nCancel to keep current name.",
-          me?.username || ""
-        );
-
-      if (choice !== null) {
-
-        const fakeEvent =
-          choice.trim();
-
-        if (fakeEvent) {
-          updateUsernameDirect(
-            fakeEvent
-          );
-        }
-      }
-    }
+    editUsername
   );
-}
-
-
-/* =========================
-   DIRECT USERNAME UPDATE
-========================= */
-
-async function updateUsernameDirect(
-  username
-) {
-
-  if (!me) {
-    return;
-  }
-
-  if (
-    username.length < 2 ||
-    username.length > 30
-  ) {
-
-    alert(
-      "Name must be between 2 and 30 characters."
-    );
-
-    return;
-  }
-
-  try {
-
-    const response =
-      await fetch(
-        "/api/profile",
-        {
-          method: "PUT",
-
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-
-          body: JSON.stringify({
-            id:
-              me.id,
-
-            username
-          })
-        }
-      );
-
-    const data =
-      await response.json();
-
-    if (!response.ok) {
-
-      alert(
-        data.error ||
-        "Unable to update name."
-      );
-
-      return;
-    }
-
-    me =
-      data;
-
-    saveMe();
-
-    updateProfileUI();
-
-    renderUsers();
-
-    updateSelectedUser();
-
-  } catch (error) {
-
-    console.error(error);
-
-    alert(
-      "Profile update failed."
-    );
-  }
 }
 
 
@@ -2053,13 +2456,61 @@ async function updateUsernameDirect(
 
 document.addEventListener(
   "DOMContentLoaded",
-  () => {
+  async () => {
 
     if (loadMe()) {
 
       showApp();
 
-      loadUsers();
+      /*
+        Refresh account/contact data
+        from server.
+
+        If server no longer has this ID,
+        local login is removed so the UI
+        doesn't show a fake account.
+      */
+
+      const loaded =
+        await loadUsers();
+
+      if (
+        loaded &&
+        me?.id
+      ) {
+
+        const serverUser =
+          users.find(
+            user =>
+              user.id === me.id
+          );
+
+        if (serverUser) {
+
+          me = {
+            ...me,
+            ...serverUser,
+            id:
+              me.id
+          };
+
+          saveMe();
+
+          updateProfileUI();
+
+        } else {
+
+          /*
+            Do NOT silently register a new
+            account. Existing account data
+            must never be replaced.
+          */
+
+          console.warn(
+            "Saved User ID was not found on server."
+          );
+        }
+      }
 
     } else {
 
