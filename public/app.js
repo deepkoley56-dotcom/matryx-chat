@@ -2319,6 +2319,6 @@ function verifiedBadge(){
       class="matryx-verified"
       title="Verified"
       aria-label="Verified"
-    >✓</span>
+    ></span>
   `;
 }
