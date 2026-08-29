@@ -1,106 +1,180 @@
-const $ = id => document.getElementById(id);
+/* =========================================================
+   MATRYX CHAT - APP.JS
+   Username Edit + Profile + Chat + Calls
+========================================================= */
 
-let me = JSON.parse(localStorage.getItem("matryx_me") || "null");
-let users = [];
-let selected = null;
-let socket = null;
-let peer = null;
-let stream = null;
-let muted = false;
+const socket = io();
 
 /* =========================
-   API
+   STATE
 ========================= */
 
-async function api(url, opt = {}) {
+let me = null;
+let users = [];
+let selectedUser = null;
 
-  const isForm =
-    opt.body instanceof FormData;
+let localStream = null;
+let peerConnection = null;
+let currentCallUser = null;
+let currentCallVideo = false;
+let isMuted = false;
 
-  const options = {
-    ...opt,
-    headers: {
-      ...(isForm
-        ? {}
-        : { "Content-Type": "application/json" }),
-      ...(opt.headers || {})
-    }
-  };
+const rtcConfig = {
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" }
+  ]
+};
 
-  const r = await fetch(url, options);
+/* =========================
+   ELEMENTS
+========================= */
 
-  let data = {};
+const authScreen = document.getElementById("auth");
+const appScreen = document.getElementById("app");
 
-  try {
-    data = await r.json();
-  } catch {}
+const phoneInput = document.getElementById("phone");
+const passwordInput = document.getElementById("password");
+const authMsg = document.getElementById("authMsg");
 
-  if (!r.ok) {
-    throw new Error(
-      data.error || "Request failed"
+const meEl = document.getElementById("me");
+const myAvatar = document.getElementById("myAvatar");
+
+const usersEl = document.getElementById("users");
+const searchInput = document.getElementById("search");
+const contactCount = document.getElementById("contactCount");
+
+const chatName = document.getElementById("chatName");
+const chatAvatar = document.getElementById("chatAvatar");
+const statusEl = document.getElementById("status");
+const typingEl = document.getElementById("typing");
+
+const messagesEl = document.getElementById("messages");
+const composer = document.getElementById("composer");
+const textInput = document.getElementById("text");
+const fileInput = document.getElementById("file");
+
+const callScreen = document.getElementById("call");
+const callTitle = document.getElementById("callTitle");
+const remoteVideo = document.getElementById("remoteVideo");
+const localVideo = document.getElementById("localVideo");
+
+
+/* =========================
+   STORAGE
+========================= */
+
+function saveMe() {
+  if (me) {
+    localStorage.setItem(
+      "matryx_me",
+      JSON.stringify(me)
     );
   }
-
-  return data;
 }
 
+function loadMe() {
+  try {
+    const saved =
+      JSON.parse(
+        localStorage.getItem("matryx_me") || "null"
+      );
+
+    if (
+      saved &&
+      saved.id &&
+      saved.username
+    ) {
+      me = saved;
+      return true;
+    }
+  } catch {}
+
+  return false;
+}
+
+function clearMe() {
+  localStorage.removeItem("matryx_me");
+  me = null;
+}
+
+
 /* =========================
-   LOGIN / REGISTER
+   AUTH UI
 ========================= */
 
-async function auth(mode) {
+function showAuth() {
+  if (authScreen) {
+    authScreen.classList.remove("hidden");
+  }
 
-  const phoneInput = $("phone");
-  const passwordInput = $("password");
-  const msg = $("authMsg");
+  if (appScreen) {
+    appScreen.classList.add("hidden");
+  }
+}
+
+function showApp() {
+  if (authScreen) {
+    authScreen.classList.add("hidden");
+  }
+
+  if (appScreen) {
+    appScreen.classList.remove("hidden");
+  }
+
+  updateProfileUI();
+  renderUsers();
+
+  if (me) {
+    socket.emit("join", me);
+  }
+}
+
+
+/* =========================
+   AUTH
+========================= */
+
+async function auth(type) {
+
+  if (!phoneInput || !passwordInput) {
+    return;
+  }
 
   const phone =
-    phoneInput
-      ? phoneInput.value.trim()
-      : "";
+    phoneInput.value.trim();
 
   const password =
-    passwordInput
-      ? passwordInput.value
-      : "";
+    passwordInput.value;
 
-  if (!phone) {
-    if (msg)
-      msg.textContent =
-        "Enter your phone number.";
+  if (!phone || !password) {
+    setAuthMessage(
+      "Phone number and password are required."
+    );
     return;
   }
 
-  if (!password) {
-    if (msg)
-      msg.textContent =
-        "Enter your password.";
-    return;
-  }
-
-  if (password.length < 6) {
-    if (msg)
-      msg.textContent =
-        "Password must be at least 6 characters.";
-    return;
-  }
+  setAuthMessage(
+    type === "login"
+      ? "Logging in..."
+      : "Creating account..."
+  );
 
   try {
 
-    if (msg) {
-      msg.textContent =
-        mode === "register"
-          ? "Creating account..."
-          : "Logging in...";
-    }
-
-    const result =
-      await api(
-        mode === "register"
-          ? "/api/register"
-          : "/api/login",
+    const response =
+      await fetch(
+        type === "login"
+          ? "/api/login"
+          : "/api/register",
         {
           method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+
           body: JSON.stringify({
             phone,
             password
@@ -108,23 +182,42 @@ async function auth(mode) {
         }
       );
 
-    me = result;
+    const data =
+      await response.json();
 
-    localStorage.setItem(
-      "matryx_me",
-      JSON.stringify(me)
-    );
+    if (!response.ok) {
+      setAuthMessage(
+        data.error ||
+        "Something went wrong."
+      );
+      return;
+    }
 
-    await boot();
+    me = data;
+
+    saveMe();
+
+    setAuthMessage("");
+
+    showApp();
 
   } catch (error) {
 
-    if (msg) {
-      msg.textContent =
-        error.message;
-    }
+    console.error(error);
+
+    setAuthMessage(
+      "Server connection failed."
+    );
   }
 }
+
+function setAuthMessage(message) {
+  if (authMsg) {
+    authMsg.textContent =
+      message || "";
+  }
+}
+
 
 /* =========================
    LOGOUT
@@ -132,994 +225,460 @@ async function auth(mode) {
 
 function logout() {
 
-  try {
+  endCall();
 
-    if (socket) {
-      socket.disconnect();
-      socket = null;
-    }
+  clearMe();
 
-  } catch {}
+  selectedUser = null;
 
-  if (window.matryxUserSync) {
-
-    clearInterval(
-      window.matryxUserSync
-    );
-
-    window.matryxUserSync = null;
+  if (messagesEl) {
+    messagesEl.innerHTML = `
+      <div class="empty-chat">
+        <div class="empty-logo">M</div>
+        <h2>MATRYX CHAT</h2>
+        <p>Select a contact to start a private conversation</p>
+      </div>
+    `;
   }
 
-  localStorage.removeItem(
-    "matryx_me"
-  );
-
-  location.reload();
+  showAuth();
 }
 
-/* =========================
-   BOOT
-========================= */
-
-async function boot() {
-
-  if (!me || !me.id) {
-
-    $("auth")?.classList.remove(
-      "hidden"
-    );
-
-    $("app")?.classList.add(
-      "hidden"
-    );
-
-    return;
-  }
-
-  $("auth")?.classList.add(
-    "hidden"
-  );
-
-  $("app")?.classList.remove(
-    "hidden"
-  );
-
-  updateMyProfileUI();
-
-  /* SOCKET */
-
-  socket = io({
-    transports: [
-      "websocket",
-      "polling"
-    ]
-  });
-
-  socket.on("connect", () => {
-
-    socket.emit(
-      "join",
-      me
-    );
-
-  });
-
-  socket.on(
-    "connect_error",
-    error => {
-
-      console.log(
-        "Socket connection error:",
-        error.message
-      );
-
-    }
-  );
-
-  /* MESSAGE */
-
-  socket.on(
-    "message",
-    async message => {
-
-      if (
-        selected &&
-        (
-          message.from === selected.id ||
-          message.to === selected.id
-        )
-      ) {
-
-        await renderMessages();
-      }
-
-    }
-  );
-
-  /* USERS */
-
-  socket.on(
-    "users:update",
-    list => {
-
-      const old =
-        new Map(
-          users.map(
-            user => [
-              user.id,
-              user
-            ]
-          )
-        );
-
-      users =
-        list
-          .filter(
-            user =>
-              user.id !== me.id
-          )
-          .map(
-            user => ({
-              ...user,
-              online:
-                old.get(user.id)
-                  ?.online || false
-            })
-          );
-
-      if (
-        selected
-      ) {
-
-        const updatedSelected =
-          users.find(
-            user =>
-              user.id ===
-              selected.id
-          );
-
-        if (updatedSelected) {
-          selected =
-            updatedSelected;
-
-          updateChatHeader();
-        }
-      }
-
-      renderUsers();
-
-    }
-  );
-
-  /* PROFILE UPDATE */
-
-  socket.on(
-    "profile:update",
-    updated => {
-
-      if (
-        !updated ||
-        !updated.id
-      ) return;
-
-      if (
-        updated.id === me.id
-      ) {
-
-        me = {
-          ...me,
-          ...updated
-        };
-
-        localStorage.setItem(
-          "matryx_me",
-          JSON.stringify(me)
-        );
-
-        updateMyProfileUI();
-      }
-
-      const existing =
-        users.find(
-          user =>
-            user.id ===
-            updated.id
-        );
-
-      if (existing) {
-
-        Object.assign(
-          existing,
-          updated
-        );
-      }
-
-      if (
-        selected &&
-        selected.id ===
-        updated.id
-      ) {
-
-        selected = {
-          ...selected,
-          ...updated
-        };
-
-        updateChatHeader();
-      }
-
-      renderUsers();
-    }
-  );
-
-  /* PRESENCE */
-
-  socket.on(
-    "presence",
-    presence => {
-
-      const user =
-        users.find(
-          item =>
-            item.id ===
-            presence.userId
-        );
-
-      if (!user) return;
-
-      user.online =
-        !!presence.online;
-
-      renderUsers();
-
-      if (
-        selected &&
-        selected.id ===
-        presence.userId
-      ) {
-
-        $("status").textContent =
-          presence.online
-            ? "Online"
-            : "Offline";
-      }
-
-    }
-  );
-
-  /* TYPING */
-
-  socket.on(
-    "typing",
-    data => {
-
-      if (
-        selected &&
-        selected.id ===
-        data.from
-      ) {
-
-        $("typing").textContent =
-          data.active
-            ? "typing..."
-            : "";
-      }
-
-    }
-  );
-
-  /* CALL */
-
-  socket.on(
-    "call:offer",
-    receiveOffer
-  );
-
-  socket.on(
-    "call:answer",
-    async data => {
-
-      if (!peer) return;
-
-      try {
-
-        await peer.setRemoteDescription(
-          data.answer
-        );
-
-      } catch (error) {
-
-        console.log(error);
-
-      }
-
-    }
-  );
-
-  socket.on(
-    "call:ice",
-    async data => {
-
-      if (
-        peer &&
-        data.candidate
-      ) {
-
-        try {
-
-          await peer.addIceCandidate(
-            data.candidate
-          );
-
-        } catch {}
-
-      }
-
-    }
-  );
-
-  socket.on(
-    "call:end",
-    cleanupCall
-  );
-
-  /* LOAD USERS */
-
-  try {
-
-    const list =
-      await api(
-        "/api/users"
-      );
-
-    users =
-      list
-        .filter(
-          user =>
-            user.id !== me.id
-        )
-        .map(
-          user => ({
-            ...user,
-            online: false
-          })
-        );
-
-    renderUsers();
-
-  } catch (error) {
-
-    console.log(error);
-
-  }
-
-  /* USER SYNC */
-
-  if (
-    !window.matryxUserSync
-  ) {
-
-    window.matryxUserSync =
-      setInterval(
-        async () => {
-
-          try {
-
-            const list =
-              await api(
-                "/api/users"
-              );
-
-            const states =
-              new Map(
-                users.map(
-                  user => [
-                    user.id,
-                    user.online
-                  ]
-                )
-              );
-
-            users =
-              list
-                .filter(
-                  user =>
-                    user.id !== me.id
-                )
-                .map(
-                  user => ({
-                    ...user,
-                    online:
-                      states.get(
-                        user.id
-                      ) || false
-                  })
-                );
-
-            renderUsers();
-
-          } catch {}
-
-        },
-        3000
-      );
-  }
-}
 
 /* =========================
    PROFILE UI
 ========================= */
 
-function updateMyProfileUI() {
+function updateProfileUI() {
 
   if (!me) return;
 
-  const displayName =
-    me.username ||
-    me.phone ||
-    "user";
-
-  if ($("me")) {
-    $("me").textContent =
-      "@" + displayName;
+  if (meEl) {
+    meEl.textContent =
+      "@" + me.username;
   }
 
-  updateMyAvatar();
-}
-
-function updateMyAvatar() {
-
-  const avatar =
-    $("myAvatar");
-
-  if (!avatar || !me) return;
-
-  if (me.avatar) {
-
-    avatar.innerHTML = `
-      <img
-        src="${safeUrl(me.avatar)}"
-        alt="Profile"
-      >
-    `;
-
-    avatar.classList.add(
-      "has-photo"
-    );
-
-  } else {
-
-    avatar.textContent =
-      (
-        me.username ||
-        me.phone ||
-        "M"
-      )
-        .charAt(0)
-        .toUpperCase();
-
-    avatar.classList.remove(
-      "has-photo"
-    );
-  }
-}
-
-function updateChatAvatar() {
-
-  const avatar =
-    $("chatAvatar");
-
-  if (!avatar) return;
-
-  const user =
-    selected;
-
-  if (!user) {
-
-    avatar.textContent = "M";
-
-    avatar.classList.remove(
-      "has-photo"
-    );
-
-    return;
-  }
-
-  if (user.avatar) {
-
-    avatar.innerHTML = `
-      <img
-        src="${safeUrl(user.avatar)}"
-        alt="Profile"
-      >
-    `;
-
-    avatar.classList.add(
-      "has-photo"
-    );
-
-  } else {
-
-    const name =
-      user.username ||
-      "M";
-
-    avatar.textContent =
-      name
-        .charAt(0)
-        .toUpperCase();
-
-    avatar.classList.remove(
-      "has-photo"
-    );
-  }
-}
-
-function updateChatHeader() {
-
-  if (!selected) return;
-
-  $("chatName").textContent =
-    selected.username ||
-    "User";
-
-  $("status").textContent =
-    selected.online
-      ? "Online"
-      : "Offline";
-
-  updateChatAvatar();
-}
-
-/* =========================
-   EDIT PROFILE
-========================= */
-
-function openEditProfile() {
-
-  if (!me) return;
-
-  const modal =
-    $("profileModal");
-
-  if (!modal) return;
-
-  const nameInput =
-    $("profileName");
-
-  if (nameInput) {
-    nameInput.value =
-      me.username ||
-      "";
-  }
-
-  const preview =
-    $("profilePreview");
-
-  if (preview) {
-
-    if (me.avatar) {
-
-      preview.innerHTML = `
-        <img
-          src="${safeUrl(me.avatar)}"
-          alt="Profile preview"
-        >
-      `;
-
-    } else {
-
-      preview.textContent =
-        (
-          me.username ||
-          me.phone ||
-          "M"
-        )
-          .charAt(0)
-          .toUpperCase();
-    }
-  }
-
-  modal.classList.remove(
-    "hidden"
+  updateAvatarElement(
+    myAvatar,
+    me.username,
+    me.avatar
   );
 }
 
-function closeEditProfile() {
+function updateAvatarElement(
+  element,
+  username,
+  avatar
+) {
 
-  $("profileModal")
-    ?.classList
-    .add("hidden");
+  if (!element) return;
+
+  if (avatar) {
+
+    element.style.backgroundImage =
+      `url("${avatar}")`;
+
+    element.style.backgroundSize =
+      "cover";
+
+    element.style.backgroundPosition =
+      "center";
+
+    element.textContent = "";
+
+  } else {
+
+    element.style.backgroundImage =
+      "";
+
+    element.textContent =
+      String(username || "M")
+        .charAt(0)
+        .toUpperCase();
+  }
 }
 
-async function saveProfile() {
 
-  if (!me) return;
+/* =========================
+   USERNAME EDIT
+========================= */
 
-  const input =
-    $("profileName");
+async function editUsername() {
 
-  const name =
-    input
-      ? input.value.trim()
-      : "";
-
-  if (!name) {
-
-    alert(
-      "Please enter your name."
-    );
-
+  if (!me) {
     return;
   }
 
-  if (name.length > 30) {
+  const current =
+    me.username || "";
 
-    alert(
-      "Name must be 30 characters or less."
+  const newName =
+    window.prompt(
+      "Enter your new name:",
+      current
     );
 
+  if (newName === null) {
     return;
   }
 
-  const button =
-    $("saveProfileBtn");
+  const username =
+    newName.trim();
 
-  if (button) {
-    button.disabled = true;
-    button.textContent =
-      "SAVING...";
+  if (!username) {
+    alert("Name cannot be empty.");
+    return;
+  }
+
+  if (username.length < 2) {
+    alert("Name must be at least 2 characters.");
+    return;
+  }
+
+  if (username.length > 30) {
+    alert("Name must be 30 characters or less.");
+    return;
   }
 
   try {
 
-    const updated =
-      await api(
-        `/api/profile/${encodeURIComponent(
-          me.id
-        )}`,
+    const response =
+      await fetch(
+        "/api/profile",
         {
           method: "PUT",
+
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+
           body: JSON.stringify({
-            username: name
+            id: me.id,
+            username
           })
         }
       );
 
-    me = {
-      ...me,
-      ...updated
-    };
+    const data =
+      await response.json();
 
-    localStorage.setItem(
-      "matryx_me",
-      JSON.stringify(me)
-    );
-
-    updateMyProfileUI();
-
-    const mine =
-      users.find(
-        user =>
-          user.id === me.id
+    if (!response.ok) {
+      alert(
+        data.error ||
+        "Name update failed."
       );
-
-    if (mine) {
-      Object.assign(
-        mine,
-        updated
-      );
+      return;
     }
 
-    closeEditProfile();
+    me = data;
+
+    saveMe();
+
+    updateProfileUI();
 
     renderUsers();
 
+    updateSelectedUser();
+
+    alert("Name updated successfully.");
+
   } catch (error) {
 
+    console.error(error);
+
     alert(
-      error.message
+      "Unable to update name."
     );
-
-  } finally {
-
-    if (button) {
-      button.disabled = false;
-      button.textContent =
-        "SAVE CHANGES";
-    }
   }
 }
 
+
 /* =========================
-   PROFILE PICTURE
+   PROFILE PHOTO
 ========================= */
 
-async function changeProfilePicture(
-  input
-) {
+async function uploadAvatar(file) {
 
-  if (
-    !me ||
-    !input ||
-    !input.files ||
-    !input.files[0]
-  ) {
+  if (!me || !file) {
     return;
   }
 
-  const file =
-    input.files[0];
-
-  if (
-    !file.type.startsWith(
-      "image/"
-    )
-  ) {
-
-    alert(
-      "Please select an image."
-    );
-
-    input.value = "";
-
+  if (!file.type.startsWith("image/")) {
+    alert("Please select an image.");
     return;
   }
 
-  if (
-    file.size >
-    10 * 1024 * 1024
-  ) {
-
-    alert(
-      "Profile picture must be 10MB or smaller."
-    );
-
-    input.value = "";
-
-    return;
-  }
-
-  const form =
+  const formData =
     new FormData();
 
-  form.append(
+  formData.append(
     "avatar",
     file
   );
 
+  formData.append(
+    "id",
+    me.id
+  );
+
   try {
 
-    const preview =
-      $("profilePreview");
-
-    if (preview) {
-
-      preview.innerHTML = `
-        <img
-          src="${URL.createObjectURL(file)}"
-          alt="Profile preview"
-        >
-      `;
-    }
-
-    const result =
-      await api(
-        `/api/profile/${encodeURIComponent(
-          me.id
-        )}/avatar`,
+    const response =
+      await fetch(
+        "/api/profile/avatar",
         {
           method: "POST",
-          body: form
+          body: formData
         }
       );
 
-    me = {
-      ...me,
-      ...result
-    };
+    const data =
+      await response.json();
 
-    localStorage.setItem(
-      "matryx_me",
-      JSON.stringify(me)
-    );
+    if (!response.ok) {
+      alert(
+        data.error ||
+        "Profile photo upload failed."
+      );
+      return;
+    }
 
-    updateMyProfileUI();
+    me =
+      data.user || {
+        ...me,
+        avatar: data.avatar
+      };
 
-    closeEditProfile();
+    saveMe();
+
+    updateProfileUI();
 
     renderUsers();
 
+    updateSelectedUser();
+
   } catch (error) {
 
+    console.error(error);
+
     alert(
-      error.message
+      "Profile photo upload failed."
     );
-
-  } finally {
-
-    input.value = "";
   }
 }
 
-async function removeProfilePicture() {
 
-  if (
-    !me ||
-    !me.avatar
-  ) return;
+/* =========================
+   USERS
+========================= */
 
-  const ok =
-    confirm(
-      "Remove your profile picture?"
-    );
-
-  if (!ok) return;
+async function loadUsers() {
 
   try {
 
-    const result =
-      await api(
-        `/api/profile/${encodeURIComponent(
-          me.id
-        )}/avatar`,
-        {
-          method: "DELETE"
-        }
-      );
+    const response =
+      await fetch("/api/users");
 
-    me = {
-      ...me,
-      ...result
-    };
+    if (!response.ok) {
+      return;
+    }
 
-    localStorage.setItem(
-      "matryx_me",
-      JSON.stringify(me)
-    );
-
-    updateMyProfileUI();
-
-    closeEditProfile();
+    users =
+      await response.json();
 
     renderUsers();
 
+    updateSelectedUser();
+
   } catch (error) {
 
-    alert(
-      error.message
+    console.error(
+      "USERS ERROR:",
+      error
     );
   }
 }
-
-/* =========================
-   USER LIST
-========================= */
 
 function renderUsers() {
 
-  const box =
-    $("users");
-
-  if (!box) return;
+  if (!usersEl) return;
 
   const query =
-    (
-      $("search")?.value ||
-      ""
-    )
-      .toLowerCase()
-      .trim();
-
-  box.innerHTML = "";
+    searchInput
+      ? searchInput.value
+          .trim()
+          .toLowerCase()
+      : "";
 
   const filtered =
-    users.filter(
-      user =>
-        String(
-          user.username || ""
-        )
-          .toLowerCase()
-          .includes(query)
-    );
+    users.filter(user => {
 
-  if ($("contactCount")) {
+      if (!me) return false;
 
-    $("contactCount").textContent =
-      filtered.length
-        ? filtered.length
-        : "";
-  }
-
-  filtered.forEach(
-    user => {
-
-      const item =
-        document.createElement(
-          "div"
-        );
-
-      item.className =
-        "user" +
-        (
-          selected?.id ===
-          user.id
-            ? " active"
-            : ""
-        );
-
-      const username =
-        esc(
-          user.username ||
-          "User"
-        );
-
-      let avatarHTML;
-
-      if (user.avatar) {
-
-        avatarHTML = `
-          <div class="user-avatar has-photo">
-            <img
-              src="${safeUrl(user.avatar)}"
-              alt=""
-              loading="lazy"
-            >
-          </div>
-        `;
-
-      } else {
-
-        const initial =
-          String(
-            user.username ||
-            "U"
-          )
-            .charAt(0)
-            .toUpperCase();
-
-        avatarHTML = `
-          <div class="user-avatar">
-            ${initial}
-          </div>
-        `;
+      if (user.id === me.id) {
+        return false;
       }
 
-      item.innerHTML = `
+      if (!query) {
+        return true;
+      }
 
-        ${avatarHTML}
+      return String(
+        user.username || ""
+      )
+        .toLowerCase()
+        .includes(query);
+    });
 
-        <div class="user-info">
+  if (contactCount) {
+    contactCount.textContent =
+      filtered.length;
+  }
 
-          <b>${username}</b>
+  usersEl.innerHTML = "";
 
-          <small>
-            <span class="online ${
-              user.online
-                ? "on"
-                : ""
-            }"></span>
+  if (!filtered.length) {
 
-            ${
-              user.online
-                ? "Online"
-                : "Offline"
-            }
+    usersEl.innerHTML = `
+      <div style="
+        padding:20px 8px;
+        color:#666;
+        font-size:11px;
+        text-align:center;
+      ">
+        No users found
+      </div>
+    `;
 
-          </small>
+    return;
+  }
 
-        </div>
-      `;
+  filtered.forEach(user => {
 
-      item.onclick =
-        () => selectUser(user);
+    const item =
+      document.createElement("div");
 
-      box.appendChild(
-        item
+    item.className =
+      "user" +
+      (
+        selectedUser &&
+        selectedUser.id === user.id
+          ? " active"
+          : ""
+      );
+
+    item.dataset.id =
+      user.id;
+
+    item.innerHTML = `
+      <b></b>
+      <small>@${escapeHtml(
+        user.username || "User"
+      )}</small>
+      <span class="online"></span>
+    `;
+
+    const nameElement =
+      item.querySelector("b");
+
+    nameElement.textContent =
+      user.username || "User";
+
+    const onlineDot =
+      item.querySelector(".online");
+
+    if (
+      onlineUsers.has(user.id)
+    ) {
+      onlineDot.classList.add("on");
+    }
+
+    item.addEventListener(
+      "click",
+      () => selectUser(user)
+    );
+
+    usersEl.appendChild(item);
+  });
+}
+
+
+/* =========================
+   ONLINE USERS
+========================= */
+
+const onlineUsers =
+  new Set();
+
+socket.on(
+  "presence",
+  data => {
+
+    if (!data?.userId) {
+      return;
+    }
+
+    if (data.online) {
+      onlineUsers.add(
+        data.userId
+      );
+    } else {
+      onlineUsers.delete(
+        data.userId
       );
     }
-  );
-}
+
+    renderUsers();
+
+    updateSelectedUser();
+  }
+);
+
+
+/* =========================
+   PROFILE UPDATE SOCKET
+========================= */
+
+socket.on(
+  "profile:update",
+  updated => {
+
+    if (!updated?.id) {
+      return;
+    }
+
+    const index =
+      users.findIndex(
+        user =>
+          user.id === updated.id
+      );
+
+    if (index !== -1) {
+      users[index] = updated;
+    }
+
+    if (
+      me &&
+      updated.id === me.id
+    ) {
+      me = updated;
+      saveMe();
+      updateProfileUI();
+    }
+
+    if (
+      selectedUser &&
+      updated.id === selectedUser.id
+    ) {
+      selectedUser = updated;
+      updateSelectedUser();
+    }
+
+    renderUsers();
+  }
+);
+
 
 /* =========================
    SELECT USER
@@ -1127,469 +686,703 @@ function renderUsers() {
 
 async function selectUser(user) {
 
-  selected = user;
+  if (!user || !me) {
+    return;
+  }
 
-  updateChatHeader();
+  selectedUser = user;
 
-  $("typing").textContent =
-    "";
+  updateSelectedUser();
 
   renderUsers();
 
-  await renderMessages();
+  await loadMessages();
 }
+
+function updateSelectedUser() {
+
+  if (!selectedUser) {
+    return;
+  }
+
+  if (chatName) {
+    chatName.textContent =
+      selectedUser.username ||
+      "User";
+  }
+
+  updateAvatarElement(
+    chatAvatar,
+    selectedUser.username,
+    selectedUser.avatar
+  );
+
+  if (statusEl) {
+
+    statusEl.textContent =
+      onlineUsers.has(
+        selectedUser.id
+      )
+        ? "Active now"
+        : "Offline";
+  }
+}
+
 
 /* =========================
    MESSAGES
 ========================= */
 
-async function renderMessages() {
+async function loadMessages() {
 
-  if (!selected) return;
+  if (
+    !me ||
+    !selectedUser ||
+    !messagesEl
+  ) {
+    return;
+  }
 
   try {
 
-    const list =
-      await api(
+    const response =
+      await fetch(
         `/api/messages/${encodeURIComponent(
           me.id
         )}/${encodeURIComponent(
-          selected.id
+          selectedUser.id
         )}`
       );
 
-    const box =
-      $("messages");
-
-    if (!box) return;
-
-    box.innerHTML = "";
-
-    if (!list.length) {
-
-      box.innerHTML = `
-        <div class="empty-chat">
-
-          <div class="empty-logo">
-            M
-          </div>
-
-          <h2>
-            MATRYX CHAT
-          </h2>
-
-          <p>
-            No messages yet.
-            Start the conversation.
-          </p>
-
-        </div>
-      `;
-
+    if (!response.ok) {
       return;
     }
 
-    list.forEach(
-      message => {
+    const messages =
+      await response.json();
 
-        const bubble =
-          document.createElement(
-            "div"
-          );
-
-        bubble.className =
-          "bubble " +
-          (
-            message.from ===
-            me.id
-              ? "mine"
-              : ""
-          );
-
-        let body = "";
-
-        if (
-          message.type ===
-          "text"
-        ) {
-
-          body =
-            esc(
-              message.text ||
-              ""
-            );
-
-        } else if (
-          message.type ===
-          "image"
-        ) {
-
-          body = `
-            <img
-              src="${safeUrl(
-                message.file?.url
-              )}"
-              alt="Image"
-              loading="lazy"
-            >
-          `;
-
-        } else if (
-          message.type ===
-          "video"
-        ) {
-
-          body = `
-            <video
-              src="${safeUrl(
-                message.file?.url
-              )}"
-              controls
-              playsinline
-            ></video>
-          `;
-
-        } else if (
-          message.file
-        ) {
-
-          body = `
-            <a
-              href="${safeUrl(
-                message.file.url
-              )}"
-              target="_blank"
-              rel="noopener"
-            >
-              ${esc(
-                message.file.name ||
-                "Download file"
-              )}
-            </a>
-          `;
-        }
-
-        const time =
-          new Date(
-            message.time
-          ).toLocaleTimeString(
-            [],
-            {
-              hour: "2-digit",
-              minute: "2-digit"
-            }
-          );
-
-        bubble.innerHTML =
-          body +
-          `
-            <div class="time">
-              ${time}
-            </div>
-          `;
-
-        box.appendChild(
-          bubble
-        );
-      }
-    );
-
-    box.scrollTop =
-      box.scrollHeight;
+    renderMessages(messages);
 
   } catch (error) {
 
-    console.log(error);
-
+    console.error(
+      "MESSAGES ERROR:",
+      error
+    );
   }
 }
+
+function renderMessages(messages) {
+
+  if (!messagesEl) {
+    return;
+  }
+
+  messagesEl.innerHTML = "";
+
+  if (!messages.length) {
+
+    messagesEl.innerHTML = `
+      <div class="empty-chat">
+        <div class="empty-logo">M</div>
+        <h2>PRIVATE CHAT</h2>
+        <p>Send a message to start the conversation</p>
+      </div>
+    `;
+
+    return;
+  }
+
+  messages.forEach(
+    renderMessage
+  );
+
+  scrollMessages();
+}
+
+function renderMessage(message) {
+
+  if (!messagesEl || !message) {
+    return;
+  }
+
+  const bubble =
+    document.createElement("div");
+
+  bubble.className =
+    "bubble" +
+    (
+      me &&
+      message.from === me.id
+        ? " mine"
+        : ""
+    );
+
+  if (message.type === "image") {
+
+    if (message.file?.url) {
+
+      const img =
+        document.createElement("img");
+
+      img.src =
+        message.file.url;
+
+      img.alt =
+        message.file.name || "Image";
+
+      img.loading =
+        "lazy";
+
+      bubble.appendChild(img);
+    }
+
+  } else if (
+    message.type === "video"
+  ) {
+
+    if (message.file?.url) {
+
+      const video =
+        document.createElement("video");
+
+      video.src =
+        message.file.url;
+
+      video.controls =
+        true;
+
+      video.playsInline =
+        true;
+
+      bubble.appendChild(video);
+    }
+
+  } else if (
+    message.type === "file"
+  ) {
+
+    if (message.file?.url) {
+
+      const link =
+        document.createElement("a");
+
+      link.href =
+        message.file.url;
+
+      link.target =
+        "_blank";
+
+      link.rel =
+        "noopener";
+
+      link.textContent =
+        "📎 " +
+        (
+          message.file.name ||
+          "Open file"
+        );
+
+      bubble.appendChild(link);
+    }
+
+  } else {
+
+    const text =
+      document.createElement("div");
+
+    text.textContent =
+      message.text || "";
+
+    bubble.appendChild(text);
+  }
+
+  const time =
+    document.createElement("div");
+
+  time.className =
+    "time";
+
+  time.textContent =
+    formatTime(message.time);
+
+  bubble.appendChild(time);
+
+  messagesEl.appendChild(
+    bubble
+  );
+}
+
+function formatTime(timestamp) {
+
+  if (!timestamp) {
+    return "";
+  }
+
+  try {
+
+    return new Date(
+      timestamp
+    ).toLocaleTimeString(
+      [],
+      {
+        hour: "2-digit",
+        minute: "2-digit"
+      }
+    );
+
+  } catch {
+
+    return "";
+  }
+}
+
+function scrollMessages() {
+
+  if (!messagesEl) {
+    return;
+  }
+
+  requestAnimationFrame(
+    () => {
+      messagesEl.scrollTop =
+        messagesEl.scrollHeight;
+    }
+  );
+}
+
 
 /* =========================
    SEND MESSAGE
 ========================= */
 
-$("composer").onsubmit =
-  event => {
+if (composer) {
 
-    event.preventDefault();
+  composer.addEventListener(
+    "submit",
+    async event => {
 
-    if (!selected) {
+      event.preventDefault();
 
-      alert(
-        "Select a user first."
+      if (
+        !me ||
+        !selectedUser ||
+        !textInput
+      ) {
+        return;
+      }
+
+      const text =
+        textInput.value.trim();
+
+      if (!text) {
+        return;
+      }
+
+      socket.emit(
+        "message",
+        {
+          to:
+            selectedUser.id,
+
+          type:
+            "text",
+
+          text
+        }
       );
 
+      textInput.value = "";
+
+      socket.emit(
+        "typing",
+        {
+          to:
+            selectedUser.id,
+
+          active:
+            false
+        }
+      );
+    }
+  );
+}
+
+
+/* =========================
+   RECEIVE MESSAGE
+========================= */
+
+socket.on(
+  "message",
+  message => {
+
+    if (!message) {
       return;
     }
 
-    const input =
-      $("text");
-
-    const text =
-      input.value.trim();
-
-    if (!text) return;
-
     if (
-      !socket ||
-      !socket.connected
+      selectedUser &&
+      me &&
+      (
+        (
+          message.from === me.id &&
+          message.to === selectedUser.id
+        ) ||
+        (
+          message.from === selectedUser.id &&
+          message.to === me.id
+        )
+      )
     ) {
 
-      alert(
-        "Connection is not ready. Please wait."
+      const empty =
+        messagesEl?.querySelector(
+          ".empty-chat"
+        );
+
+      if (empty) {
+        messagesEl.innerHTML = "";
+      }
+
+      renderMessage(message);
+
+      scrollMessages();
+    }
+  }
+);
+
+
+/* =========================
+   FILE UPLOAD
+========================= */
+
+if (fileInput) {
+
+  fileInput.addEventListener(
+    "change",
+    async () => {
+
+      const file =
+        fileInput.files?.[0];
+
+      if (!file) {
+        return;
+      }
+
+      if (
+        !me ||
+        !selectedUser
+      ) {
+
+        alert(
+          "Select a contact first."
+        );
+
+        fileInput.value = "";
+
+        return;
+      }
+
+      await sendFile(file);
+
+      fileInput.value = "";
+    }
+  );
+}
+
+async function sendFile(file) {
+
+  try {
+
+    const formData =
+      new FormData();
+
+    formData.append(
+      "file",
+      file
+    );
+
+    const response =
+      await fetch(
+        "/api/upload",
+        {
+          method: "POST",
+          body: formData
+        }
       );
 
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      alert(
+        data.error ||
+        "File upload failed."
+      );
       return;
+    }
+
+    let type =
+      "file";
+
+    if (
+      file.type.startsWith(
+        "image/"
+      )
+    ) {
+      type = "image";
+
+    } else if (
+      file.type.startsWith(
+        "video/"
+      )
+    ) {
+      type = "video";
     }
 
     socket.emit(
       "message",
       {
         to:
-          selected.id,
+          selectedUser.id,
 
-        type:
-          "text",
+        type,
 
-        text
+        text:
+          "",
+
+        file: {
+          url:
+            data.url,
+
+          name:
+            data.name,
+
+          mime:
+            data.mime,
+
+          size:
+            data.size
+        }
       }
     );
 
-    input.value = "";
+  } catch (error) {
 
-    socket.emit(
-      "typing",
-      {
-        to:
-          selected.id,
+    console.error(error);
 
-        active:
-          false
-      }
+    alert(
+      "File upload failed."
     );
-  };
+  }
+}
+
 
 /* =========================
    TYPING
 ========================= */
 
-$("text").oninput =
-  () => {
+let typingTimer = null;
 
-    if (
-      !selected ||
-      !socket
-    ) return;
+if (textInput) {
 
-    socket.emit(
-      "typing",
-      {
-        to:
-          selected.id,
+  textInput.addEventListener(
+    "input",
+    () => {
 
-        active:
-          $("text").value.length >
-          0
+      if (
+        !selectedUser ||
+        !me
+      ) {
+        return;
       }
-    );
-  };
 
-/* =========================
-   FILE UPLOAD
-========================= */
+      socket.emit(
+        "typing",
+        {
+          to:
+            selectedUser.id,
 
-$("file").onchange =
-  async () => {
+          active:
+            true
+        }
+      );
+
+      clearTimeout(
+        typingTimer
+      );
+
+      typingTimer =
+        setTimeout(
+          () => {
+
+            socket.emit(
+              "typing",
+              {
+                to:
+                  selectedUser.id,
+
+                active:
+                  false
+              }
+            );
+
+          },
+          900
+        );
+    }
+  );
+}
+
+socket.on(
+  "typing",
+  data => {
 
     if (
-      !selected ||
-      !$("file").files[0]
+      !selectedUser ||
+      !data
     ) {
       return;
     }
 
-    const file =
-      $("file").files[0];
-
-    try {
-
-      const form =
-        new FormData();
-
-      form.append(
-        "file",
-        file
-      );
-
-      const response =
-        await fetch(
-          "/api/upload",
-          {
-            method: "POST",
-            body: form
-          }
-        );
-
-      const result =
-        await response.json();
-
-      if (!response.ok) {
-
-        alert(
-          result.error ||
-          "Upload failed."
-        );
-
-        return;
-      }
-
-      const type =
-        file.type.startsWith(
-          "image/"
-        )
-          ? "image"
-          : file.type.startsWith(
-              "video/"
-            )
-              ? "video"
-              : "file";
-
-      socket.emit(
-        "message",
-        {
-          to:
-            selected.id,
-
-          type,
-
-          file:
-            result
-        }
-      );
-
-      $("file").value = "";
-
-    } catch (error) {
-
-      console.log(error);
-
-      alert(
-        "File upload failed."
-      );
+    if (
+      data.from !==
+      selectedUser.id
+    ) {
+      return;
     }
-  };
+
+    if (typingEl) {
+
+      typingEl.textContent =
+        data.active
+          ? `${selectedUser.username || "User"} is typing...`
+          : "";
+    }
+
+    setTimeout(
+      () => {
+
+        if (
+          typingEl &&
+          data.active
+        ) {
+          typingEl.textContent = "";
+        }
+
+      },
+      1500
+    );
+  }
+);
+
 
 /* =========================
-   ESCAPE HTML
+   SOCKET CONNECT
 ========================= */
 
-function esc(value) {
+socket.on(
+  "connect",
+  () => {
 
-  return String(value)
-    .replace(
-      /[&<>"']/g,
-      character =>
-        ({
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-          "'": "&#039;"
-        }[character])
-    );
-}
+    if (me) {
+      socket.emit(
+        "join",
+        me
+      );
+    }
 
-function safeUrl(url) {
-
-  if (!url) return "";
-
-  const value =
-    String(url);
-
-  if (
-    value.startsWith(
-      "/uploads/"
-    )
-  ) {
-
-    return value;
+    loadUsers();
   }
+);
 
-  return "";
-}
+socket.on(
+  "users:update",
+  list => {
+
+    if (
+      Array.isArray(list)
+    ) {
+
+      users = list;
+
+      renderUsers();
+
+      updateSelectedUser();
+    }
+  }
+);
+
 
 /* =========================
-   VOICE / VIDEO CALL
+   CALLS
 ========================= */
 
 async function startCall(video) {
 
-  if (!selected) {
+  if (
+    !me ||
+    !selectedUser
+  ) {
 
     alert(
-      "Select a user first."
+      "Select a contact first."
     );
 
     return;
   }
 
-  if (!selected.online) {
-
-    alert(
-      "User is offline."
-    );
-
+  if (currentCallUser) {
     return;
   }
+
+  currentCallUser =
+    selectedUser.id;
+
+  currentCallVideo =
+    !!video;
+
+  isMuted = false;
 
   try {
 
-    $("call")
-      .classList
-      .remove("hidden");
-
-    $("callTitle").textContent =
-      (
-        video
-          ? "Video"
-          : "Voice"
-      ) +
-      " call with " +
-      selected.username;
-
-    stream =
-      await navigator
-        .mediaDevices
-        .getUserMedia({
+    localStream =
+      await navigator.mediaDevices.getUserMedia(
+        {
           audio: true,
-          video
-        });
+          video: !!video
+        }
+      );
 
-    $("localVideo").srcObject =
-      stream;
+    openCallScreen(
+      video,
+      selectedUser.username
+    );
 
-    $("localVideo").style.display =
-      video
-        ? "block"
-        : "none";
+    if (localVideo) {
+      localVideo.srcObject =
+        localStream;
+    }
 
-    peer =
-      makePeer();
+    createPeerConnection();
 
-    stream
+    localStream
       .getTracks()
       .forEach(
-        track =>
-          peer.addTrack(
+        track => {
+
+          peerConnection.addTrack(
             track,
-            stream
-          )
+            localStream
+          );
+        }
       );
 
     const offer =
-      await peer.createOffer();
+      await peerConnection.createOffer();
 
-    await peer.setLocalDescription(
+    await peerConnection.setLocalDescription(
       offer
     );
 
@@ -1597,56 +1390,55 @@ async function startCall(video) {
       "call:offer",
       {
         to:
-          selected.id,
+          selectedUser.id,
 
         offer,
 
-        video
+        video:
+          !!video
       }
     );
 
   } catch (error) {
 
-    console.log(error);
-
-    cleanupCall();
+    console.error(
+      "CALL ERROR:",
+      error
+    );
 
     alert(
-      "Camera or microphone permission is required."
+      "Camera/microphone permission is required."
     );
+
+    endCall();
   }
 }
 
+
 /* =========================
-   WEBRTC
+   CREATE PEER
 ========================= */
 
-function makePeer() {
+function createPeerConnection() {
 
-  const connection =
-    new RTCPeerConnection({
-      iceServers: [
-        {
-          urls:
-            "stun:stun.l.google.com:19302"
-        }
-      ]
-    });
+  peerConnection =
+    new RTCPeerConnection(
+      rtcConfig
+    );
 
-  connection.onicecandidate =
+  peerConnection.onicecandidate =
     event => {
 
       if (
         event.candidate &&
-        selected &&
-        socket
+        currentCallUser
       ) {
 
         socket.emit(
           "call:ice",
           {
             to:
-              selected.id,
+              currentCallUser,
 
             candidate:
               event.candidate
@@ -1655,213 +1447,389 @@ function makePeer() {
       }
     };
 
-  connection.ontrack =
+  peerConnection.ontrack =
     event => {
 
       if (
-        event.streams &&
+        remoteVideo &&
         event.streams[0]
       ) {
 
-        $("remoteVideo")
-          .srcObject =
+        remoteVideo.srcObject =
           event.streams[0];
+
+        const placeholder =
+          document.querySelector(
+            ".remote-placeholder"
+          );
+
+        if (placeholder) {
+          placeholder.style.display =
+            "none";
+        }
       }
     };
 
-  return connection;
+  peerConnection.onconnectionstatechange =
+    () => {
+
+      if (
+        !peerConnection
+      ) {
+        return;
+      }
+
+      const state =
+        peerConnection.connectionState;
+
+      if (
+        state === "failed" ||
+        state === "disconnected" ||
+        state === "closed"
+      ) {
+        endCall();
+      }
+    };
 }
 
+
 /* =========================
-   RECEIVE CALL
+   INCOMING CALL
 ========================= */
 
-async function receiveOffer(data) {
+socket.on(
+  "call:offer",
+  async data => {
 
-  if (
-    !data ||
-    !data.from
-  ) return;
+    if (
+      !me ||
+      !data?.from ||
+      !data?.offer
+    ) {
+      return;
+    }
 
-  const accepted =
-    confirm(
-      "Incoming " +
-      (
-        data.video
-          ? "video"
-          : "voice"
-      ) +
-      " call. Accept?"
-    );
+    const caller =
+      users.find(
+        user =>
+          user.id === data.from
+      );
 
-  if (!accepted) {
+    const callerName =
+      caller?.username ||
+      "User";
 
-    socket.emit(
-      "call:end",
-      {
-        to:
-          data.from
+    if (currentCallUser) {
+
+      socket.emit(
+        "call:end",
+        {
+          to:
+            data.from
+        }
+      );
+
+      return;
+    }
+
+    const accept =
+      window.confirm(
+        `${callerName} is calling you.\n\nPress OK to accept.`
+      );
+
+    if (!accept) {
+
+      socket.emit(
+        "call:end",
+        {
+          to:
+            data.from
+        }
+      );
+
+      return;
+    }
+
+    currentCallUser =
+      data.from;
+
+    currentCallVideo =
+      !!data.video;
+
+    isMuted = false;
+
+    try {
+
+      localStream =
+        await navigator.mediaDevices.getUserMedia(
+          {
+            audio: true,
+            video:
+              !!data.video
+          }
+        );
+
+      openCallScreen(
+        !!data.video,
+        callerName
+      );
+
+      if (localVideo) {
+        localVideo.srcObject =
+          localStream;
       }
-    );
 
+      createPeerConnection();
+
+      localStream
+        .getTracks()
+        .forEach(
+          track => {
+
+            peerConnection.addTrack(
+              track,
+              localStream
+            );
+          }
+        );
+
+      await peerConnection.setRemoteDescription(
+        new RTCSessionDescription(
+          data.offer
+        )
+      );
+
+      const answer =
+        await peerConnection.createAnswer();
+
+      await peerConnection.setLocalDescription(
+        answer
+      );
+
+      socket.emit(
+        "call:answer",
+        {
+          to:
+            data.from,
+
+          answer
+        }
+      );
+
+    } catch (error) {
+
+      console.error(
+        "INCOMING CALL ERROR:",
+        error
+      );
+
+      endCall();
+    }
+  }
+);
+
+
+/* =========================
+   CALL ANSWER
+========================= */
+
+socket.on(
+  "call:answer",
+  async data => {
+
+    if (
+      !peerConnection ||
+      !data?.answer
+    ) {
+      return;
+    }
+
+    try {
+
+      await peerConnection.setRemoteDescription(
+        new RTCSessionDescription(
+          data.answer
+        )
+      );
+
+    } catch (error) {
+
+      console.error(
+        "ANSWER ERROR:",
+        error
+      );
+    }
+  }
+);
+
+
+/* =========================
+   ICE
+========================= */
+
+socket.on(
+  "call:ice",
+  async data => {
+
+    if (
+      !peerConnection ||
+      !data?.candidate
+    ) {
+      return;
+    }
+
+    try {
+
+      await peerConnection.addIceCandidate(
+        new RTCIceCandidate(
+          data.candidate
+        )
+      );
+
+    } catch (error) {
+
+      console.error(
+        "ICE ERROR:",
+        error
+      );
+    }
+  }
+);
+
+
+/* =========================
+   END CALL REMOTE
+========================= */
+
+socket.on(
+  "call:end",
+  () => {
+
+    endCall(
+      false
+    );
+  }
+);
+
+
+/* =========================
+   CALL UI
+========================= */
+
+function openCallScreen(
+  video,
+  name
+) {
+
+  if (!callScreen) {
     return;
   }
 
-  const caller =
-    users.find(
-      user =>
-        user.id ===
-        data.from
-    );
+  callScreen.classList.remove(
+    "hidden"
+  );
 
-  if (caller) {
-
-    selected =
-      caller;
-
-    updateChatHeader();
-
-    renderUsers();
+  if (callTitle) {
+    callTitle.textContent =
+      `${video ? "Video" : "Voice"} call • ${name || "User"}`;
   }
 
-  try {
+  if (remoteVideo) {
 
-    $("call")
-      .classList
-      .remove("hidden");
-
-    $("callTitle").textContent =
-      (
-        data.video
-          ? "Video"
-          : "Voice"
-      ) +
-      " call";
-
-    stream =
-      await navigator
-        .mediaDevices
-        .getUserMedia({
-          audio: true,
-          video:
-            !!data.video
-        });
-
-    $("localVideo").srcObject =
-      stream;
-
-    $("localVideo").style.display =
-      data.video
+    remoteVideo.style.display =
+      video
         ? "block"
         : "none";
+  }
 
-    peer =
-      makePeer();
+  if (localVideo) {
 
-    stream
-      .getTracks()
-      .forEach(
-        track =>
-          peer.addTrack(
-            track,
-            stream
-          )
-      );
-
-    await peer.setRemoteDescription(
-      data.offer
-    );
-
-    const answer =
-      await peer.createAnswer();
-
-    await peer.setLocalDescription(
-      answer
-    );
-
-    socket.emit(
-      "call:answer",
-      {
-        to:
-          data.from,
-
-        answer
-      }
-    );
-
-  } catch (error) {
-
-    console.log(error);
-
-    cleanupCall();
-
-    alert(
-      "Unable to access camera or microphone."
-    );
+    localVideo.style.display =
+      video
+        ? "block"
+        : "none";
   }
 }
+
 
 /* =========================
    END CALL
 ========================= */
 
-function endCall() {
+function endCall(
+  notify = true
+) {
+
+  const target =
+    currentCallUser;
 
   if (
-    selected &&
-    socket
+    notify &&
+    target
   ) {
 
     socket.emit(
       "call:end",
       {
         to:
-          selected.id
+          target
       }
     );
   }
 
-  cleanupCall();
-}
-
-function cleanupCall() {
-
-  if (stream) {
-
-    stream
-      .getTracks()
-      .forEach(
-        track =>
-          track.stop()
-      );
-  }
-
-  if (peer) {
+  if (peerConnection) {
 
     try {
-      peer.close();
+      peerConnection.close();
     } catch {}
 
+    peerConnection =
+      null;
   }
 
-  stream = null;
-  peer = null;
-  muted = false;
+  if (localStream) {
 
-  if ($("remoteVideo")) {
-    $("remoteVideo")
-      .srcObject = null;
+    localStream
+      .getTracks()
+      .forEach(
+        track => {
+
+          try {
+            track.stop();
+          } catch {}
+        }
+      );
+
+    localStream =
+      null;
   }
 
-  if ($("localVideo")) {
-    $("localVideo")
-      .srcObject = null;
+  if (remoteVideo) {
+    remoteVideo.srcObject =
+      null;
   }
 
-  $("call")
-    ?.classList
-    .add("hidden");
+  if (localVideo) {
+    localVideo.srcObject =
+      null;
+  }
+
+  currentCallUser =
+    null;
+
+  currentCallVideo =
+    false;
+
+  isMuted =
+    false;
+
+  if (callScreen) {
+    callScreen.classList.add(
+      "hidden"
+    );
+  }
 }
+
 
 /* =========================
    MUTE
@@ -1869,58 +1837,233 @@ function cleanupCall() {
 
 function toggleMute() {
 
-  if (!stream) return;
+  if (!localStream) {
+    return;
+  }
 
-  muted =
-    !muted;
+  isMuted =
+    !isMuted;
 
-  stream
+  localStream
     .getAudioTracks()
     .forEach(
       track => {
         track.enabled =
-          !muted;
+          !isMuted;
       }
     );
 }
 
+
 /* =========================
-   CLOSE PROFILE ON BACKDROP
+   ESCAPE HTML
 ========================= */
 
-document.addEventListener(
-  "click",
-  event => {
+function escapeHtml(value) {
 
-    const modal =
-      $("profileModal");
+  return String(value || "")
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+    .replace(
+      /</g,
+      "&lt;"
+    )
+    .replace(
+      />/g,
+      "&gt;"
+    )
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+    .replace(
+      /'/g,
+      "&#039;"
+    );
+}
 
-    if (
-      modal &&
-      event.target ===
-      modal
-    ) {
-      closeEditProfile();
-    }
-  }
-);
 
 /* =========================
-   AUTO LOGIN
+   GLOBAL FUNCTIONS
+========================= */
+
+window.auth =
+  auth;
+
+window.logout =
+  logout;
+
+window.selectUser =
+  selectUser;
+
+window.startCall =
+  startCall;
+
+window.endCall =
+  endCall;
+
+window.toggleMute =
+  toggleMute;
+
+window.editUsername =
+  editUsername;
+
+window.uploadAvatar =
+  uploadAvatar;
+
+
+/* =========================
+   PROFILE CLICK SUPPORT
+========================= */
+
+if (meEl) {
+
+  meEl.style.cursor =
+    "pointer";
+
+  meEl.title =
+    "Click to edit your name";
+
+  meEl.addEventListener(
+    "click",
+    editUsername
+  );
+}
+
+if (myAvatar) {
+
+  myAvatar.style.cursor =
+    "pointer";
+
+  myAvatar.title =
+    "Click to edit profile";
+
+  myAvatar.addEventListener(
+    "click",
+    () => {
+
+      const choice =
+        window.prompt(
+          "Type your new name.\n\nCancel to keep current name.",
+          me?.username || ""
+        );
+
+      if (choice !== null) {
+
+        const fakeEvent =
+          choice.trim();
+
+        if (fakeEvent) {
+          updateUsernameDirect(
+            fakeEvent
+          );
+        }
+      }
+    }
+  );
+}
+
+
+/* =========================
+   DIRECT USERNAME UPDATE
+========================= */
+
+async function updateUsernameDirect(
+  username
+) {
+
+  if (!me) {
+    return;
+  }
+
+  if (
+    username.length < 2 ||
+    username.length > 30
+  ) {
+
+    alert(
+      "Name must be between 2 and 30 characters."
+    );
+
+    return;
+  }
+
+  try {
+
+    const response =
+      await fetch(
+        "/api/profile",
+        {
+          method: "PUT",
+
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+
+          body: JSON.stringify({
+            id:
+              me.id,
+
+            username
+          })
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+
+      alert(
+        data.error ||
+        "Unable to update name."
+      );
+
+      return;
+    }
+
+    me =
+      data;
+
+    saveMe();
+
+    updateProfileUI();
+
+    renderUsers();
+
+    updateSelectedUser();
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert(
+      "Profile update failed."
+    );
+  }
+}
+
+
+/* =========================
+   INIT
 ========================= */
 
 document.addEventListener(
   "DOMContentLoaded",
   () => {
 
-    if (
-      me &&
-      me.id
-    ) {
+    if (loadMe()) {
 
-      boot();
+      showApp();
 
+      loadUsers();
+
+    } else {
+
+      showAuth();
     }
-
   }
 );

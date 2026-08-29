@@ -1,4 +1,5 @@
 <!doctype html>
+
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -6,418 +7,535 @@
 <meta name="theme-color" content="#070707">
 <title>MATRYX CHAT</title>
 <link rel="stylesheet" href="style.css">
-</head>
-
-<body>
-
-<div class="bg-effects">
-  <span></span>
-  <span></span>
-  <span></span>
+</head><body><div class="bg-effects">
+  <span></span><span></span><span></span>
+</div><!-- ================= AUTH ================= --><div id="auth" class="screen">  <div class="auth-glow"></div>  <div class="card auth-card"><div class="brand-mark">
+  <div class="logo">M</div>
+  <div class="logo-ring"></div>
 </div>
 
-<!-- AUTH -->
-<div id="auth" class="screen">
-  <div class="auth-glow"></div>
+<div class="premium-label">
+  <span></span> PRIVATE MESSAGING <span></span>
+</div>
 
-  <div class="card auth-card">
+<h1>MATRYX <strong>CHAT</strong></h1>
+<p class="auth-subtitle">Fast. Private. Real-time.</p>
 
-    <div class="brand-mark">
-      <div class="logo">M</div>
-      <div class="logo-ring"></div>
-    </div>
+<div class="input-wrap">
+  <span class="input-icon">📱</span>
 
-    <div class="premium-label">
-      <span></span>
-      PRIVATE MESSAGING
-      <span></span>
-    </div>
+  <input
+    id="phone"
+    type="tel"
+    inputmode="numeric"
+    autocomplete="tel"
+    placeholder="Phone number"
+    maxlength="15"
+  >
+</div>
 
-    <h1>MATRYX <strong>CHAT</strong></h1>
-    <p class="auth-subtitle">Fast. Private. Real-time.</p>
+<div class="input-wrap">
 
-    <div class="input-wrap">
-      <span class="input-icon">📱</span>
-      <input
-        id="phone"
-        type="tel"
-        inputmode="numeric"
-        autocomplete="tel"
-        placeholder="Phone number"
-        maxlength="15"
-      >
-    </div>
+  <span class="input-icon">🔐</span>
 
-    <div class="input-wrap">
-      <span class="input-icon">🔐</span>
+  <input
+    id="password"
+    type="password"
+    autocomplete="current-password"
+    placeholder="Password"
+    maxlength="100"
+  >
 
-      <input
-        id="password"
-        type="password"
-        autocomplete="current-password"
-        placeholder="Password"
-        maxlength="100"
-      >
+  <button
+    type="button"
+    class="password-toggle"
+    onclick="togglePassword()"
+    aria-label="Show password"
+  >👁</button>
 
-      <button
-        type="button"
-        class="password-toggle"
-        onclick="togglePassword()"
-        aria-label="Show password"
-      >👁</button>
-    </div>
+</div>
 
-    <div class="row">
+<div class="row">
 
-      <button
-        class="primary-btn"
-        onclick="auth('login')"
-      >
-        <span>LOGIN</span>
-        <i></i>
-      </button>
+  <button
+    class="primary-btn"
+    onclick="auth('login')"
+  >
+    <span>LOGIN</span>
+    <i></i>
+  </button>
 
-      <button
-        class="ghost"
-        onclick="auth('register')"
-      >
-        REGISTER
-      </button>
+  <button
+    class="ghost"
+    onclick="auth('register')"
+  >
+    REGISTER
+  </button>
 
-    </div>
+</div>
 
-    <small id="authMsg"></small>
+<small id="authMsg"></small>
 
-    <div class="auth-footer">
-      <span class="secure-dot"></span>
-      MATRYX PRIVATE NETWORK
+<div class="auth-footer">
+  <span class="secure-dot"></span>
+  MATRYX PRIVATE NETWORK
+</div>
+
+  </div></div><!-- ================= APP ================= --><div id="app" class="hidden">  <!-- SIDEBAR -->  <aside><div class="sidebar-top">
+
+  <div class="brand">
+
+    <div class="mini-logo">M</div>
+
+    <div>
+      <b>MATRYX</b>
+      <small>CHAT</small>
     </div>
 
   </div>
-</div>
 
-
-<!-- APP -->
-<div id="app" class="hidden">
-
-  <!-- SIDEBAR -->
-  <aside>
-
-    <div class="sidebar-top">
-
-      <div class="brand">
-
-        <div class="mini-logo">M</div>
-
-        <div>
-          <b>MATRYX</b>
-          <small>CHAT</small>
-        </div>
-
-      </div>
-
-      <div class="brand-status">
-        <span></span>
-        LIVE
-      </div>
-
-    </div>
-
-
-    <!-- PROFILE -->
-    <div class="profile-card">
-
-      <div
-        class="avatar"
-        id="myAvatar"
-      >
-        M
-      </div>
-
-      <div class="profile-info">
-
-        <b id="me">@user</b>
-
-        <small>
-          <span></span>
-          Active now
-        </small>
-
-      </div>
-
-      <button
-        id="logoutBtn"
-        type="button"
-        onclick="logout()"
-        title="Logout"
-      >
-        ⎋
-      </button>
-
-    </div>
-
-
-    <!-- SEARCH -->
-    <div class="search-wrap">
-
-      <span>⌕</span>
-
-      <input
-        id="search"
-        placeholder="Search users..."
-        oninput="renderUsers()"
-      >
-
-    </div>
-
-
-    <!-- CONTACTS -->
-    <div class="section-title">
-
-      <span>CONTACTS</span>
-
-      <small id="contactCount"></small>
-
-    </div>
-
-    <div id="users"></div>
-
-
-    <div class="sidebar-footer">
-      <span class="pulse"></span>
-      MATRYX CHAT • SECURE
-    </div>
-
-  </aside>
-
-
-  <!-- MAIN CHAT -->
-  <main>
-
-    <!-- HEADER -->
-    <header>
-
-      <div class="chat-user">
-
-        <div
-          class="chat-avatar"
-          id="chatAvatar"
-        >
-          M
-        </div>
-
-        <div>
-
-          <b id="chatName">
-            Select a user
-          </b>
-
-          <span id="status"></span>
-
-          <span id="typing"></span>
-
-        </div>
-
-      </div>
-
-
-      <!-- CALL BUTTONS -->
-      <div class="call-buttons">
-
-        <button
-          onclick="startCall(false)"
-          title="Voice call"
-          type="button"
-        >
-          <span>☎</span>
-        </button>
-
-        <button
-          onclick="startCall(true)"
-          title="Video call"
-          type="button"
-        >
-          <span>▣</span>
-        </button>
-
-      </div>
-
-    </header>
-
-
-    <!-- MESSAGES -->
-    <section id="messages">
-
-      <div class="empty-chat">
-
-        <div class="empty-logo">
-          M
-        </div>
-
-        <h2>
-          MATRYX CHAT
-        </h2>
-
-        <p>
-          Select a contact to start a private conversation
-        </p>
-
-      </div>
-
-    </section>
-
-
-    <!-- TYPING -->
-    <div id="typing"></div>
-
-
-    <!-- MESSAGE COMPOSER -->
-    <form id="composer">
-
-      <label
-        class="attach"
-        title="Attach file"
-      >
-
-        <span>＋</span>
-
-        <input
-          id="file"
-          type="file"
-          accept="image/*,video/*,.pdf,.txt,.zip"
-          hidden
-        >
-
-      </label>
-
-
-      <div class="message-input">
-
-        <input
-          id="text"
-          autocomplete="off"
-          placeholder="Write a message..."
-        >
-
-      </div>
-
-
-      <button
-        class="send-btn"
-        type="submit"
-      >
-
-        <span>SEND</span>
-
-        <b>➤</b>
-
-      </button>
-
-    </form>
-
-  </main>
+  <div class="brand-status">
+    <span></span> LIVE
+  </div>
 
 </div>
 
 
-<!-- CALL SCREEN -->
-<div
-  id="call"
-  class="call hidden"
->
+<!-- PROFILE CARD -->
 
-  <div class="callbar">
+<div class="profile-card">
+
+  <div
+    class="avatar"
+    id="myAvatar"
+  >
+    M
+  </div>
+
+  <div class="profile-info">
+
+    <b id="me">@user</b>
+
+    <small>
+      <span></span>
+      Active now
+    </small>
+
+  </div>
+
+  <!-- EDIT PROFILE -->
+
+  <button
+    id="editProfileBtn"
+    type="button"
+    onclick="openEditProfile()"
+    title="Edit Profile"
+    aria-label="Edit Profile"
+  >
+    ✎
+  </button>
+
+  <!-- LOGOUT -->
+
+  <button
+    id="logoutBtn"
+    type="button"
+    onclick="logout()"
+    title="Logout"
+  >
+    ⎋
+  </button>
+
+</div>
+
+
+<!-- SEARCH -->
+
+<div class="search-wrap">
+
+  <span>⌕</span>
+
+  <input
+    id="search"
+    placeholder="Search users..."
+    oninput="renderUsers()"
+  >
+
+</div>
+
+
+<div class="section-title">
+
+  <span>CONTACTS</span>
+
+  <small id="contactCount"></small>
+
+</div>
+
+
+<div id="users"></div>
+
+
+<div class="sidebar-footer">
+
+  <span class="pulse"></span>
+  MATRYX CHAT • SECURE
+
+</div>
+
+  </aside>  <!-- ================= CHAT ================= -->  <main><header>
+
+  <div class="chat-user">
+
+    <div
+      class="chat-avatar"
+      id="chatAvatar"
+    >
+      M
+    </div>
 
     <div>
 
-      <small>
-        MATRYX CALL
-      </small>
-
-      <b id="callTitle">
-        Call
+      <b id="chatName">
+        Select a user
       </b>
 
+      <span id="status"></span>
+
+      <span id="typing"></span>
+
     </div>
-
-
-    <button
-      type="button"
-      onclick="endCall()"
-    >
-      ✕
-    </button>
 
   </div>
 
 
-  <div class="videos">
+  <div class="call-buttons">
 
-    <div class="remote-wrap">
+    <button
+      onclick="startCall(false)"
+      title="Voice call"
+      type="button"
+    >
+      <span>☎</span>
+    </button>
 
-      <video
-        id="remoteVideo"
-        autoplay
-        playsinline
-      ></video>
+    <button
+      onclick="startCall(true)"
+      title="Video call"
+      type="button"
+    >
+      <span>▣</span>
+    </button>
+
+  </div>
+
+</header>
 
 
-      <div class="remote-placeholder">
+<!-- MESSAGES -->
 
-        <div class="call-avatar">
-          M
-        </div>
+<section id="messages">
 
-        <span>
-          Connecting...
-        </span>
+  <div class="empty-chat">
 
-      </div>
-
+    <div class="empty-logo">
+      M
     </div>
 
+    <h2>
+      MATRYX CHAT
+    </h2>
 
-    <video
-      id="localVideo"
-      autoplay
-      muted
-      playsinline
-    ></video>
+    <p>
+      Select a contact to start a private conversation
+    </p>
+
+  </div>
+
+</section>
+
+
+<div id="typing"></div>
+
+
+<!-- COMPOSER -->
+
+<form id="composer">
+
+  <label
+    class="attach"
+    title="Attach file"
+  >
+
+    <span>＋</span>
+
+    <input
+      id="file"
+      type="file"
+      accept="image/*,video/*,.pdf,.txt,.zip"
+      hidden
+    >
+
+  </label>
+
+
+  <div class="message-input">
+
+    <input
+      id="text"
+      autocomplete="off"
+      placeholder="Write a message..."
+    >
 
   </div>
 
 
-  <div class="call-actions">
+  <button
+    class="send-btn"
+    type="submit"
+  >
 
-    <button
-      type="button"
-      onclick="toggleMute()"
-      title="Mute"
-    >
-      🎙
-    </button>
+    <span>SEND</span>
+    <b>➤</b>
 
-    <button
-      type="button"
-      class="end-call"
-      onclick="endCall()"
+  </button>
+
+</form>
+
+  </main></div><!-- ================= EDIT PROFILE MODAL ================= --><div
+  id="editProfileModal"
+  class="profile-modal hidden"
+>  <div
+    class="profile-modal-backdrop"
+    onclick="closeEditProfile()"
+  ></div>  <div class="profile-editor"><!-- HEADER -->
+
+<div class="profile-editor-header">
+
+  <div>
+
+    <small>MATRYX ACCOUNT</small>
+
+    <h2>
+      Edit Profile
+    </h2>
+
+  </div>
+
+  <button
+    type="button"
+    class="profile-close"
+    onclick="closeEditProfile()"
+    aria-label="Close"
+  >
+    ✕
+  </button>
+
+</div>
+
+
+<!-- PROFILE PREVIEW -->
+
+<div class="profile-preview">
+
+  <div class="profile-photo-wrap">
+
+    <div
+      id="editAvatarPreview"
+      class="profile-big-avatar"
     >
-      ● END CALL
-    </button>
+      M
+    </div>
+
+    <label
+      class="photo-change-btn"
+      title="Change profile photo"
+    >
+
+      📷
+
+      <input
+        id="avatarFile"
+        type="file"
+        accept="image/*"
+        hidden
+        onchange="previewAvatar(event)"
+      >
+
+    </label>
+
+  </div>
+
+  <div class="profile-preview-text">
+
+    <b id="editPreviewName">
+      @user
+    </b>
+
+    <small>
+      Profile photo & name
+    </small>
 
   </div>
 
 </div>
 
 
-<!-- SOCKET.IO -->
-<script src="/socket.io/socket.io.js"></script>
+<!-- NAME -->
 
-<!-- APP JS -->
-<script src="app.js"></script>
+<div class="profile-field">
+
+  <label for="editUsername">
+    DISPLAY NAME
+  </label>
+
+  <div class="profile-input-wrap">
+
+    <span>👤</span>
+
+    <input
+      id="editUsername"
+      type="text"
+      maxlength="30"
+      autocomplete="off"
+      placeholder="Enter your name"
+      oninput="updateEditNamePreview()"
+    >
+
+  </div>
+
+  <small class="field-hint">
+    This name will be visible to other MATRYX CHAT users.
+  </small>
+
+</div>
 
 
-<script>
+<!-- PHONE -->
+
+<div class="profile-field">
+
+  <label>
+    PHONE NUMBER
+  </label>
+
+  <div class="profile-input-wrap disabled">
+
+    <span>📱</span>
+
+    <input
+      id="editPhone"
+      type="text"
+      readonly
+      disabled
+    >
+
+  </div>
+
+  <small class="field-hint">
+    Phone number cannot be changed here.
+  </small>
+
+</div>
+
+
+<!-- STATUS -->
+
+<small
+  id="profileMsg"
+  class="profile-message"
+></small>
+
+
+<!-- ACTIONS -->
+
+<div class="profile-editor-actions">
+
+  <button
+    type="button"
+    class="profile-cancel"
+    onclick="closeEditProfile()"
+  >
+    CANCEL
+  </button>
+
+  <button
+    type="button"
+    class="profile-save"
+    onclick="saveProfileChanges()"
+  >
+
+    <span>SAVE CHANGES</span>
+    <i></i>
+
+  </button>
+
+</div>
+
+  </div></div><!-- ================= CALL SCREEN ================= --><div id="call" class="call hidden">  <div class="callbar"><div>
+
+  <small>MATRYX CALL</small>
+
+  <b id="callTitle">
+    Call
+  </b>
+
+</div>
+
+<button
+  type="button"
+  onclick="endCall()"
+>
+  ✕
+</button>
+
+  </div>  <div class="videos"><div class="remote-wrap">
+
+  <video
+    id="remoteVideo"
+    autoplay
+    playsinline
+  ></video>
+
+  <div class="remote-placeholder">
+
+    <div class="call-avatar">
+      M
+    </div>
+
+    <span>
+      Connecting...
+    </span>
+
+  </div>
+
+</div>
+
+
+<video
+  id="localVideo"
+  autoplay
+  muted
+  playsinline
+></video>
+
+  </div>  <div class="call-actions"><button
+  type="button"
+  onclick="toggleMute()"
+  title="Mute"
+>
+  🎙
+</button>
+
+<button
+  type="button"
+  class="end-call"
+  onclick="endCall()"
+>
+  ● END CALL
+</button>
+
+  </div></div><!-- ================= SCRIPTS ================= --><script src="/socket.io/socket.io.js"></script><script src="app.js"></script><script>
 
 /* =========================
    PASSWORD VISIBILITY
@@ -456,29 +574,37 @@ function updateMyAvatar(){
         localStorage.getItem("matryx_me") || "null"
       );
 
-    if(
-      meData &&
-      meData.username
-    ){
+    const avatar =
+      document.getElementById("myAvatar");
+
+    if(!avatar) return;
+
+
+    if(meData?.avatar){
+
+      avatar.innerHTML =
+        `<img src="${meData.avatar}" alt="">`;
+
+      avatar.classList.add("has-photo");
+
+    }else{
 
       const letter =
-        meData.username
+        (meData?.username || "M")
           .charAt(0)
           .toUpperCase();
 
-      const avatar =
-        document.getElementById("myAvatar");
+      avatar.textContent = letter;
 
-      if(avatar){
-
-        avatar.textContent =
-          letter;
-
-      }
+      avatar.classList.remove("has-photo");
 
     }
 
-  }catch{}
+  }catch(error){
+
+    console.error(error);
+
+  }
 
 }
 
@@ -513,12 +639,539 @@ function updateChatAvatar(){
 
 
 /* =========================
+   OPEN EDIT PROFILE
+========================= */
+
+function openEditProfile(){
+
+  const modal =
+    document.getElementById("editProfileModal");
+
+  if(!modal) return;
+
+
+  let meData = null;
+
+  try{
+
+    meData =
+      JSON.parse(
+        localStorage.getItem("matryx_me") || "null"
+      );
+
+  }catch{}
+
+
+  if(!meData) return;
+
+
+  const usernameInput =
+    document.getElementById("editUsername");
+
+  const phoneInput =
+    document.getElementById("editPhone");
+
+  const preview =
+    document.getElementById("editAvatarPreview");
+
+  const previewName =
+    document.getElementById("editPreviewName");
+
+
+  if(usernameInput){
+
+    usernameInput.value =
+      meData.username || "";
+
+  }
+
+
+  if(phoneInput){
+
+    phoneInput.value =
+      meData.phone || "";
+
+  }
+
+
+  if(previewName){
+
+    previewName.textContent =
+      meData.username
+        ? "@" + meData.username
+        : "@user";
+
+  }
+
+
+  if(preview){
+
+    if(meData.avatar){
+
+      preview.innerHTML =
+        `<img src="${meData.avatar}" alt="Profile photo">`;
+
+      preview.classList.add("has-photo");
+
+    }else{
+
+      preview.textContent =
+        (meData.username || "M")
+          .charAt(0)
+          .toUpperCase();
+
+      preview.classList.remove("has-photo");
+
+    }
+
+  }
+
+
+  const msg =
+    document.getElementById("profileMsg");
+
+  if(msg){
+
+    msg.textContent = "";
+
+  }
+
+
+  const avatarFile =
+    document.getElementById("avatarFile");
+
+  if(avatarFile){
+
+    avatarFile.value = "";
+
+  }
+
+
+  modal.classList.remove("hidden");
+
+  document.body.classList.add("modal-open");
+
+}
+
+
+/* =========================
+   CLOSE EDIT PROFILE
+========================= */
+
+function closeEditProfile(){
+
+  const modal =
+    document.getElementById("editProfileModal");
+
+  if(!modal) return;
+
+  modal.classList.add("hidden");
+
+  document.body.classList.remove("modal-open");
+
+}
+
+
+/* =========================
+   NAME PREVIEW
+========================= */
+
+function updateEditNamePreview(){
+
+  const input =
+    document.getElementById("editUsername");
+
+  const preview =
+    document.getElementById("editPreviewName");
+
+  const avatar =
+    document.getElementById("editAvatarPreview");
+
+
+  if(!input) return;
+
+
+  const name =
+    input.value.trim();
+
+
+  if(preview){
+
+    preview.textContent =
+      name
+        ? "@" + name
+        : "@user";
+
+  }
+
+
+  /*
+    Only change avatar letter if
+    no custom photo is currently shown.
+  */
+
+  if(
+    avatar &&
+    !avatar.classList.contains("has-photo")
+  ){
+
+    avatar.textContent =
+      (name || "M")
+        .charAt(0)
+        .toUpperCase();
+
+  }
+
+}
+
+
+/* =========================
+   AVATAR PREVIEW
+========================= */
+
+function previewAvatar(event){
+
+  const file =
+    event.target.files?.[0];
+
+  const preview =
+    document.getElementById("editAvatarPreview");
+
+  if(!file || !preview) return;
+
+
+  if(!file.type.startsWith("image/")){
+
+    event.target.value = "";
+
+    return;
+
+  }
+
+
+  const reader =
+    new FileReader();
+
+
+  reader.onload = function(){
+
+    preview.innerHTML =
+      `<img src="${reader.result}" alt="Profile photo preview">`;
+
+    preview.classList.add("has-photo");
+
+  };
+
+
+  reader.readAsDataURL(file);
+
+}
+
+
+/* =========================
+   SAVE PROFILE
+========================= */
+
+async function saveProfileChanges(){
+
+  const usernameInput =
+    document.getElementById("editUsername");
+
+  const avatarInput =
+    document.getElementById("avatarFile");
+
+  const msg =
+    document.getElementById("profileMsg");
+
+
+  if(!usernameInput) return;
+
+
+  const username =
+    usernameInput.value.trim();
+
+
+  if(username.length < 2){
+
+    if(msg){
+
+      msg.textContent =
+        "Name must be at least 2 characters.";
+
+    }
+
+    return;
+
+  }
+
+
+  if(username.length > 30){
+
+    if(msg){
+
+      msg.textContent =
+        "Name must be 30 characters or less.";
+
+    }
+
+    return;
+
+  }
+
+
+  let meData = null;
+
+  try{
+
+    meData =
+      JSON.parse(
+        localStorage.getItem("matryx_me") || "null"
+      );
+
+  }catch{}
+
+
+  if(!meData?.id){
+
+    if(msg){
+
+      msg.textContent =
+        "User session not found. Please login again.";
+
+    }
+
+    return;
+
+  }
+
+
+  const saveButton =
+    document.querySelector(".profile-save");
+
+
+  if(saveButton){
+
+    saveButton.disabled = true;
+
+  }
+
+
+  if(msg){
+
+    msg.textContent =
+      "Saving profile...";
+
+  }
+
+
+  try{
+
+    /*
+      First update username.
+    */
+
+    const profileResponse =
+      await fetch(
+        "/api/profile",
+        {
+          method:"PUT",
+
+          headers:{
+            "Content-Type":
+              "application/json"
+          },
+
+          body:
+            JSON.stringify({
+              id:meData.id,
+              username:username,
+              avatar:
+                meData.avatar || null
+            })
+        }
+      );
+
+
+    const profileData =
+      await profileResponse.json();
+
+
+    if(!profileResponse.ok){
+
+      throw new Error(
+        profileData.error ||
+        "Profile update failed."
+      );
+
+    }
+
+
+    let updatedUser =
+      profileData;
+
+
+    /*
+      Upload profile photo
+      if selected.
+    */
+
+    const file =
+      avatarInput?.files?.[0];
+
+
+    if(file){
+
+      if(!file.type.startsWith("image/")){
+
+        throw new Error(
+          "Please select an image file."
+        );
+
+      }
+
+
+      const formData =
+        new FormData();
+
+      formData.append(
+        "id",
+        meData.id
+      );
+
+      formData.append(
+        "avatar",
+        file
+      );
+
+
+      const avatarResponse =
+        await fetch(
+          "/api/profile/avatar",
+          {
+            method:"POST",
+            body:formData
+          }
+        );
+
+
+      const avatarData =
+        await avatarResponse.json();
+
+
+      if(!avatarResponse.ok){
+
+        throw new Error(
+          avatarData.error ||
+          "Profile photo upload failed."
+        );
+
+      }
+
+
+      updatedUser =
+        avatarData.user ||
+        updatedUser;
+
+    }
+
+
+    /*
+      Save updated user locally.
+    */
+
+    localStorage.setItem(
+      "matryx_me",
+      JSON.stringify(updatedUser)
+    );
+
+
+    /*
+      Update visible sidebar profile.
+    */
+
+    const me =
+      document.getElementById("me");
+
+    if(me){
+
+      me.textContent =
+        "@" +
+        (updatedUser.username || "user");
+
+    }
+
+
+    updateMyAvatar();
+
+
+    if(msg){
+
+      msg.textContent =
+        "Profile updated successfully.";
+
+    }
+
+
+    setTimeout(
+      closeEditProfile,
+      700
+    );
+
+
+    /*
+      Refresh users if app.js has
+      renderUsers().
+    */
+
+    if(
+      typeof renderUsers === "function"
+    ){
+
+      try{
+
+        renderUsers();
+
+      }catch{}
+
+    }
+
+
+  }catch(error){
+
+    console.error(
+      "PROFILE SAVE ERROR:",
+      error
+    );
+
+
+    if(msg){
+
+      msg.textContent =
+        error.message ||
+        "Profile update failed.";
+
+    }
+
+  }finally{
+
+    if(saveButton){
+
+      saveButton.disabled = false;
+
+    }
+
+  }
+
+}
+
+
+/* =========================
    ENTER KEY LOGIN
 ========================= */
 
 document.addEventListener(
   "DOMContentLoaded",
-  () => {
+  ()=>{
 
     const phone =
       document.getElementById("phone");
@@ -532,6 +1185,7 @@ document.addEventListener(
       if(e.key === "Enter"){
 
         e.preventDefault();
+
 
         if(
           phone &&
@@ -576,11 +1230,31 @@ document.addEventListener(
 
 
 /* =========================
-   CHAT AVATAR SYNC
+   ESC CLOSE MODAL
 ========================= */
+
+document.addEventListener(
+  "keydown",
+  e => {
+
+    if(e.key === "Escape"){
+
+      closeEditProfile();
+
+    }
+
+  }
+);
+
+
+/*
+  Keep avatar updated after selecting
+  a contact.
+*/
 
 const originalSelectUser =
   window.selectUser;
+
 
 if(originalSelectUser){
 
@@ -595,7 +1269,5 @@ if(originalSelectUser){
 
 }
 
-</script>
-
-</body>
+</script></body>
 </html>

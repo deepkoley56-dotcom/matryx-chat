@@ -84,7 +84,7 @@ function safeUser(user) {
     id: user.id,
     username: user.username,
     phone: user.phone,
-    avatar: user.avatar || ""
+    avatar: user.avatar || null
   };
 }
 
@@ -120,11 +120,7 @@ function createPasswordHash(password) {
   };
 }
 
-function checkPassword(
-  password,
-  salt,
-  savedHash
-) {
+function checkPassword(password, salt, savedHash) {
   try {
     const hash = crypto
       .scryptSync(String(password), salt, 64)
@@ -161,14 +157,14 @@ app.use(
 ========================= */
 
 const storage = multer.diskStorage({
-  destination: function (_, __, cb) {
+  destination: function (req, file, cb) {
     cb(null, UPLOADS);
   },
 
-  filename: function (_, file, cb) {
-    const ext =
-      path.extname(file.originalname)
-        .toLowerCase();
+  filename: function (req, file, cb) {
+    const ext = path.extname(
+      file.originalname
+    );
 
     cb(
       null,
@@ -192,239 +188,216 @@ const upload = multer({
    REGISTER
 ========================= */
 
-app.post(
-  "/api/register",
-  (req, res) => {
-    try {
-      const phone =
-        normalizePhone(req.body.phone);
+app.post("/api/register", (req, res) => {
+  try {
+    const phone = normalizePhone(
+      req.body.phone
+    );
 
-      const password =
-        String(req.body.password || "");
+    const password = String(
+      req.body.password || ""
+    );
 
-      if (
-        !/^\+?\d{7,15}$/.test(phone)
-      ) {
-        return res.status(400).json({
-          error:
-            "Enter a valid phone number."
-        });
-      }
-
-      if (password.length < 6) {
-        return res.status(400).json({
-          error:
-            "Password must be at least 6 characters."
-        });
-      }
-
-      if (password.length > 128) {
-        return res.status(400).json({
-          error:
-            "Password is too long."
-        });
-      }
-
-      const data = db();
-
-      const existingUser =
-        data.users.find(
-          user =>
-            user.phone === phone
-        );
-
-      if (existingUser) {
-        return res.status(409).json({
-          error:
-            "Account already exists. Please login."
-        });
-      }
-
-      const passwordData =
-        createPasswordHash(password);
-
-      const user = {
-        id: createId(),
-
-        username:
-          "User" +
-          phone.slice(-4),
-
-        phone,
-
-        avatar: "",
-
-        passwordSalt:
-          passwordData.salt,
-
-        passwordHash:
-          passwordData.hash,
-
-        createdAt: Date.now()
-      };
-
-      data.users.push(user);
-
-      save(data);
-
-      broadcastUsers();
-
-      res.json(
-        safeUser(user)
-      );
-
-    } catch (error) {
-      console.error(
-        "REGISTER ERROR:",
-        error
-      );
-
-      res.status(500).json({
-        error:
-          "Registration failed."
+    if (!/^\+?\d{7,15}$/.test(phone)) {
+      return res.status(400).json({
+        error: "Enter a valid phone number."
       });
     }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        error:
+          "Password must be at least 6 characters."
+      });
+    }
+
+    if (password.length > 128) {
+      return res.status(400).json({
+        error: "Password is too long."
+      });
+    }
+
+    const data = db();
+
+    const existingUser = data.users.find(
+      user => user.phone === phone
+    );
+
+    if (existingUser) {
+      return res.status(409).json({
+        error:
+          "Account already exists. Please login."
+      });
+    }
+
+    const passwordData =
+      createPasswordHash(password);
+
+    const user = {
+      id: createId(),
+
+      username:
+        "User" + phone.slice(-4),
+
+      phone,
+
+      avatar: null,
+
+      passwordSalt:
+        passwordData.salt,
+
+      passwordHash:
+        passwordData.hash,
+
+      createdAt: Date.now()
+    };
+
+    data.users.push(user);
+
+    save(data);
+
+    broadcastUsers();
+
+    res.json(
+      safeUser(user)
+    );
+
+  } catch (error) {
+    console.error(
+      "REGISTER ERROR:",
+      error
+    );
+
+    res.status(500).json({
+      error: "Registration failed."
+    });
   }
-);
+});
 
 /* =========================
    LOGIN
 ========================= */
 
-app.post(
-  "/api/login",
-  (req, res) => {
-    try {
-      const phone =
-        normalizePhone(req.body.phone);
+app.post("/api/login", (req, res) => {
+  try {
+    const phone = normalizePhone(
+      req.body.phone
+    );
 
-      const password =
-        String(req.body.password || "");
+    const password = String(
+      req.body.password || ""
+    );
 
-      if (!phone || !password) {
-        return res.status(400).json({
-          error:
-            "Phone number and password are required."
-        });
-      }
-
-      const data = db();
-
-      const user =
-        data.users.find(
-          u => u.phone === phone
-        );
-
-      if (!user) {
-        return res.status(404).json({
-          error:
-            "Account not found. Please register first."
-        });
-      }
-
-      if (
-        !user.passwordHash ||
-        !user.passwordSalt
-      ) {
-        return res.status(409).json({
-          error:
-            "This is an old account. Please create a new phone account."
-        });
-      }
-
-      const valid =
-        checkPassword(
-          password,
-          user.passwordSalt,
-          user.passwordHash
-        );
-
-      if (!valid) {
-        return res.status(401).json({
-          error:
-            "Incorrect phone number or password."
-        });
-      }
-
-      res.json(
-        safeUser(user)
-      );
-
-    } catch (error) {
-      console.error(
-        "LOGIN ERROR:",
-        error
-      );
-
-      res.status(500).json({
+    if (!phone || !password) {
+      return res.status(400).json({
         error:
-          "Login failed."
+          "Phone number and password are required."
       });
     }
+
+    const data = db();
+
+    const user = data.users.find(
+      u => u.phone === phone
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        error:
+          "Account not found. Please register first."
+      });
+    }
+
+    if (
+      !user.passwordHash ||
+      !user.passwordSalt
+    ) {
+      return res.status(409).json({
+        error:
+          "This is an old account. Please create a new phone account."
+      });
+    }
+
+    const valid = checkPassword(
+      password,
+      user.passwordSalt,
+      user.passwordHash
+    );
+
+    if (!valid) {
+      return res.status(401).json({
+        error:
+          "Incorrect phone number or password."
+      });
+    }
+
+    res.json(
+      safeUser(user)
+    );
+
+  } catch (error) {
+    console.error(
+      "LOGIN ERROR:",
+      error
+    );
+
+    res.status(500).json({
+      error: "Login failed."
+    });
   }
-);
+});
 
 /* =========================
-   GET CURRENT USER
+   USERS
 ========================= */
 
-app.get(
-  "/api/profile/:id",
-  (req, res) => {
-    try {
-      const data = db();
+app.get("/api/users", (req, res) => {
+  const data = db();
 
-      const user =
-        data.users.find(
-          u =>
-            u.id === req.params.id
-        );
-
-      if (!user) {
-        return res.status(404).json({
-          error:
-            "User not found."
-        });
-      }
-
-      res.json(
-        safeUser(user)
-      );
-
-    } catch (error) {
-      console.error(
-        "PROFILE GET ERROR:",
-        error
-      );
-
-      res.status(500).json({
-        error:
-          "Unable to load profile."
-      });
-    }
-  }
-);
+  res.json(
+    data.users.map(safeUser)
+  );
+});
 
 /* =========================
-   EDIT PROFILE
+   EDIT PROFILE / USERNAME
 ========================= */
 
 app.put(
-  "/api/profile/:id",
+  "/api/profile",
   (req, res) => {
     try {
-      const userId =
-        String(req.params.id || "");
+      const id = String(
+        req.body.id || ""
+      ).trim();
 
-      const username =
-        String(
-          req.body.username || ""
-        ).trim();
+      const username = String(
+        req.body.username || ""
+      ).trim();
+
+      const avatar =
+        req.body.avatar
+          ? String(req.body.avatar)
+          : null;
+
+      if (!id) {
+        return res.status(400).json({
+          error:
+            "User ID is required."
+        });
+      }
 
       if (!username) {
         return res.status(400).json({
           error:
-            "Name cannot be empty."
+            "Name is required."
+        });
+      }
+
+      if (username.length < 2) {
+        return res.status(400).json({
+          error:
+            "Name must be at least 2 characters."
         });
       }
 
@@ -439,8 +412,7 @@ app.put(
 
       const user =
         data.users.find(
-          u =>
-            u.id === userId
+          item => item.id === id
         );
 
       if (!user) {
@@ -450,11 +422,13 @@ app.put(
         });
       }
 
-      user.username =
-        username;
+      user.username = username;
 
-      if (!user.avatar) {
-        user.avatar = "";
+      if (
+        avatar === null ||
+        avatar.startsWith("/uploads/")
+      ) {
+        user.avatar = avatar;
       }
 
       save(data);
@@ -462,14 +436,12 @@ app.put(
       const updated =
         safeUser(user);
 
-      broadcastUsers();
-
-      io.to(
-        "user:" + user.id
-      ).emit(
+      io.emit(
         "profile:update",
         updated
       );
+
+      broadcastUsers();
 
       res.json(updated);
 
@@ -488,34 +460,35 @@ app.put(
 );
 
 /* =========================
-   PROFILE PICTURE
+   PROFILE PHOTO UPLOAD
 ========================= */
 
 app.post(
-  "/api/profile/:id/avatar",
+  "/api/profile/avatar",
   upload.single("avatar"),
   (req, res) => {
     try {
-      const userId =
-        String(req.params.id || "");
+      const id = String(
+        req.body.id || ""
+      ).trim();
+
+      if (!id) {
+        return res.status(400).json({
+          error:
+            "User ID is required."
+        });
+      }
 
       if (!req.file) {
         return res.status(400).json({
           error:
-            "No profile picture selected."
+            "No profile photo selected."
         });
       }
 
-      const allowedTypes = [
-        "image/jpeg",
-        "image/png",
-        "image/webp",
-        "image/gif"
-      ];
-
       if (
-        !allowedTypes.includes(
-          req.file.mimetype
+        !req.file.mimetype.startsWith(
+          "image/"
         )
       ) {
         try {
@@ -526,23 +499,7 @@ app.post(
 
         return res.status(400).json({
           error:
-            "Only JPG, PNG, WEBP or GIF images are allowed."
-        });
-      }
-
-      if (
-        req.file.size >
-        10 * 1024 * 1024
-      ) {
-        try {
-          fs.unlinkSync(
-            req.file.path
-          );
-        } catch {}
-
-        return res.status(400).json({
-          error:
-            "Profile picture must be 10MB or smaller."
+            "Only image files are allowed."
         });
       }
 
@@ -550,8 +507,7 @@ app.post(
 
       const user =
         data.users.find(
-          u =>
-            u.id === userId
+          item => item.id === id
         );
 
       if (!user) {
@@ -567,57 +523,28 @@ app.post(
         });
       }
 
-      const oldAvatar =
-        user.avatar || "";
-
-      user.avatar =
+      const avatarUrl =
         "/uploads/" +
         req.file.filename;
 
+      user.avatar = avatarUrl;
+
       save(data);
-
-      /*
-        Delete old profile picture
-        only when it belongs to uploads.
-      */
-      if (
-        oldAvatar &&
-        oldAvatar.startsWith(
-          "/uploads/"
-        )
-      ) {
-        const oldFile =
-          path.join(
-            UPLOADS,
-            path.basename(
-              oldAvatar
-            )
-          );
-
-        try {
-          if (
-            fs.existsSync(oldFile)
-          ) {
-            fs.unlinkSync(
-              oldFile
-            );
-          }
-        } catch {}
-      }
 
       const updated =
         safeUser(user);
 
-      broadcastUsers();
-
-      io.to(
-        "user:" + user.id
-      ).emit(
+      io.emit(
         "profile:update",
         updated
       );
 
-      res.json(updated);
+      broadcastUsers();
+
+      res.json({
+        avatar: avatarUrl,
+        user: updated
+      });
 
     } catch (error) {
       console.error(
@@ -625,122 +552,11 @@ app.post(
         error
       );
 
-      if (req.file) {
-        try {
-          fs.unlinkSync(
-            req.file.path
-          );
-        } catch {}
-      }
-
       res.status(500).json({
         error:
-          "Profile picture upload failed."
+          "Profile photo upload failed."
       });
     }
-  }
-);
-
-/* =========================
-   REMOVE PROFILE PICTURE
-========================= */
-
-app.delete(
-  "/api/profile/:id/avatar",
-  (req, res) => {
-    try {
-      const userId =
-        String(req.params.id || "");
-
-      const data = db();
-
-      const user =
-        data.users.find(
-          u =>
-            u.id === userId
-        );
-
-      if (!user) {
-        return res.status(404).json({
-          error:
-            "User not found."
-        });
-      }
-
-      const oldAvatar =
-        user.avatar || "";
-
-      user.avatar = "";
-
-      save(data);
-
-      if (
-        oldAvatar &&
-        oldAvatar.startsWith(
-          "/uploads/"
-        )
-      ) {
-        const oldFile =
-          path.join(
-            UPLOADS,
-            path.basename(
-              oldAvatar
-            )
-          );
-
-        try {
-          if (
-            fs.existsSync(oldFile)
-          ) {
-            fs.unlinkSync(
-              oldFile
-            );
-          }
-        } catch {}
-      }
-
-      const updated =
-        safeUser(user);
-
-      broadcastUsers();
-
-      io.to(
-        "user:" + user.id
-      ).emit(
-        "profile:update",
-        updated
-      );
-
-      res.json(updated);
-
-    } catch (error) {
-      console.error(
-        "AVATAR REMOVE ERROR:",
-        error
-      );
-
-      res.status(500).json({
-        error:
-          "Unable to remove profile picture."
-      });
-    }
-  }
-);
-
-/* =========================
-   USERS
-========================= */
-
-app.get(
-  "/api/users",
-  (req, res) => {
-    const data = db();
-
-    res.json(
-      data.users.map(
-        safeUser
-      )
-    );
   }
 );
 
@@ -778,34 +594,47 @@ app.get(
 );
 
 /* =========================
-   FILE API
+   FILE UPLOAD
 ========================= */
 
 app.post(
   "/api/upload",
   upload.single("file"),
   (req, res) => {
-    if (!req.file) {
-      return res.status(400).json({
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          error:
+            "No file uploaded."
+        });
+      }
+
+      res.json({
+        url:
+          "/uploads/" +
+          req.file.filename,
+
+        name:
+          req.file.originalname,
+
+        mime:
+          req.file.mimetype,
+
+        size:
+          req.file.size
+      });
+
+    } catch (error) {
+      console.error(
+        "FILE UPLOAD ERROR:",
+        error
+      );
+
+      res.status(500).json({
         error:
-          "No file uploaded."
+          "File upload failed."
       });
     }
-
-    res.json({
-      url:
-        "/uploads/" +
-        req.file.filename,
-
-      name:
-        req.file.originalname,
-
-      mime:
-        req.file.mimetype,
-
-      size:
-        req.file.size
-    });
   }
 );
 
@@ -818,9 +647,7 @@ const online = new Map();
 function broadcastUsers() {
   io.emit(
     "users:update",
-    db().users.map(
-      safeUser
-    )
+    db().users.map(safeUser)
   );
 }
 
@@ -832,7 +659,9 @@ io.on(
   "connection",
   socket => {
 
-    /* JOIN */
+    /* =====================
+       JOIN
+    ===================== */
 
     socket.on(
       "join",
@@ -844,8 +673,7 @@ io.on(
 
         const realUser =
           data.users.find(
-            u =>
-              u.id === user.id
+            u => u.id === user.id
           );
 
         if (!realUser) return;
@@ -853,11 +681,7 @@ io.on(
         socket.user =
           safeUser(realUser);
 
-        if (
-          !online.has(
-            realUser.id
-          )
-        ) {
+        if (!online.has(realUser.id)) {
           online.set(
             realUser.id,
             new Set()
@@ -878,6 +702,7 @@ io.on(
           {
             userId:
               realUser.id,
+
             online: true
           }
         );
@@ -886,7 +711,9 @@ io.on(
       }
     );
 
-    /* MESSAGE */
+    /* =====================
+       MESSAGE
+    ===================== */
 
     socket.on(
       "message",
@@ -903,15 +730,13 @@ io.on(
 
         const recipient =
           data.users.find(
-            u =>
-              u.id === msg.to
+            u => u.id === msg.to
           );
 
         if (!recipient) return;
 
         const message = {
-          id:
-            createId(),
+          id: createId(),
 
           from:
             socket.user.id,
@@ -920,16 +745,13 @@ io.on(
             recipient.id,
 
           type:
-            msg.type ||
-            "text",
+            msg.type || "text",
 
           text:
-            msg.text ||
-            "",
+            msg.text || "",
 
           file:
-            msg.file ||
-            null,
+            msg.file || null,
 
           time:
             Date.now()
@@ -958,7 +780,9 @@ io.on(
       }
     );
 
-    /* TYPING */
+    /* =====================
+       TYPING
+    ===================== */
 
     socket.on(
       "typing",
@@ -989,9 +813,9 @@ io.on(
       }
     );
 
-    /* =========================
-       WEBRTC CALLING
-    ========================= */
+    /* =====================
+       WEBRTC CALL OFFER
+    ===================== */
 
     socket.on(
       "call:offer",
@@ -1025,6 +849,10 @@ io.on(
       }
     );
 
+    /* =====================
+       WEBRTC CALL ANSWER
+    ===================== */
+
     socket.on(
       "call:answer",
       data => {
@@ -1053,6 +881,10 @@ io.on(
           );
       }
     );
+
+    /* =====================
+       WEBRTC ICE
+    ===================== */
 
     socket.on(
       "call:ice",
@@ -1083,6 +915,10 @@ io.on(
       }
     );
 
+    /* =====================
+       END CALL
+    ===================== */
+
     socket.on(
       "call:end",
       data => {
@@ -1109,9 +945,60 @@ io.on(
       }
     );
 
-    /* =========================
+    /* =====================
+       PROFILE UPDATE
+    ===================== */
+
+    socket.on(
+      "profile:update",
+      data => {
+
+        if (!socket.user) return;
+
+        const id =
+          socket.user.id;
+
+        const username =
+          String(
+            data?.username || ""
+          ).trim();
+
+        if (
+          username.length < 2 ||
+          username.length > 30
+        ) {
+          return;
+        }
+
+        const database = db();
+
+        const user =
+          database.users.find(
+            item => item.id === id
+          );
+
+        if (!user) return;
+
+        user.username =
+          username;
+
+        save(database);
+
+        socket.user =
+          safeUser(user);
+
+        io.emit(
+          "profile:update",
+          socket.user
+        );
+
+        broadcastUsers();
+      }
+    );
+
+    /* =====================
        DISCONNECT
-    ========================= */
+    ===================== */
 
     socket.on(
       "disconnect",
@@ -1125,32 +1012,30 @@ io.on(
           socket.user.id;
 
         const set =
-          online.get(
+          online.get(userId);
+
+        if (!set) {
+          return;
+        }
+
+        set.delete(
+          socket.id
+        );
+
+        if (set.size === 0) {
+
+          online.delete(
             userId
           );
 
-        if (set) {
+          io.emit(
+            "presence",
+            {
+              userId,
 
-          set.delete(
-            socket.id
+              online: false
+            }
           );
-
-          if (
-            set.size === 0
-          ) {
-
-            online.delete(
-              userId
-            );
-
-            io.emit(
-              "presence",
-              {
-                userId,
-                online: false
-              }
-            );
-          }
         }
 
         broadcastUsers();
