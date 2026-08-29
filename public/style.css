@@ -47,7 +47,9 @@ button{
 }
 
 
-/* BACKGROUND */
+/* =========================
+   BACKGROUND
+========================= */
 
 .bg-effects{
   position:fixed;
@@ -86,12 +88,19 @@ button{
 }
 
 @keyframes floatGlow{
-  from{transform:translate(0,0) scale(1)}
-  to{transform:translate(35px,25px) scale(1.2)}
+  from{
+    transform:translate(0,0) scale(1);
+  }
+
+  to{
+    transform:translate(35px,25px) scale(1.2);
+  }
 }
 
 
-/* AUTH */
+/* =========================
+   AUTH
+========================= */
 
 .screen{
   position:relative;
@@ -167,8 +176,15 @@ button{
 }
 
 @keyframes ringPulse{
-  0%,100%{transform:scale(1);opacity:.45}
-  50%{transform:scale(1.12);opacity:.1}
+  0%,100%{
+    transform:scale(1);
+    opacity:.45;
+  }
+
+  50%{
+    transform:scale(1.12);
+    opacity:.1;
+  }
 }
 
 .premium-label{
@@ -228,7 +244,7 @@ button{
 .auth-card input{
   width:100%;
   height:50px;
-  padding:0 15px 0 43px;
+  padding:0 45px 0 43px;
   color:#fff;
   background:#111114;
   border:1px solid #29292e;
@@ -244,6 +260,23 @@ button{
 
 .auth-card input::placeholder{
   color:#65656d;
+}
+
+.password-toggle{
+  position:absolute;
+  right:8px;
+  top:50%;
+  transform:translateY(-50%);
+  width:36px;
+  height:36px;
+  border-radius:10px;
+  color:#aaa;
+  background:transparent;
+}
+
+.password-toggle:hover{
+  color:#fff;
+  background:#1a1a1e;
 }
 
 .row{
@@ -277,14 +310,24 @@ button{
   left:-100%;
   width:55%;
   height:100%;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);
+  background:linear-gradient(
+    90deg,
+    transparent,
+    rgba(255,255,255,.25),
+    transparent
+  );
   transform:skewX(-20deg);
   animation:shine 3s infinite;
 }
 
 @keyframes shine{
-  0%{left:-100%}
-  45%,100%{left:150%}
+  0%{
+    left:-100%;
+  }
+
+  45%,100%{
+    left:150%;
+  }
 }
 
 .ghost{
@@ -327,7 +370,9 @@ button{
 }
 
 
-/* APP */
+/* =========================
+   APP
+========================= */
 
 #app{
   position:relative;
@@ -340,7 +385,9 @@ button{
 }
 
 
-/* SIDEBAR */
+/* =========================
+   SIDEBAR
+========================= */
 
 aside{
   position:relative;
@@ -417,7 +464,9 @@ aside{
 }
 
 
-/* PROFILE */
+/* =========================
+   PROFILE
+========================= */
 
 .profile-card{
   display:flex;
@@ -497,7 +546,9 @@ aside{
 }
 
 
-/* SEARCH */
+/* =========================
+   SEARCH
+========================= */
 
 .search-wrap{
   position:relative;
@@ -535,7 +586,9 @@ aside{
 }
 
 
-/* CONTACTS */
+/* =========================
+   CONTACTS
+========================= */
 
 .section-title{
   display:flex;
@@ -647,7 +700,9 @@ aside{
 }
 
 
-/* MAIN CHAT */
+/* =========================
+   MAIN CHAT
+========================= */
 
 main{
   position:relative;
@@ -744,7 +799,9 @@ header #typing{
 }
 
 
-/* MESSAGES */
+/* =========================
+   MESSAGES
+========================= */
 
 #messages{
   position:relative;
@@ -844,7 +901,9 @@ header #typing{
 }
 
 
-/* COMPOSER */
+/* =========================
+   COMPOSER
+========================= */
 
 #composer{
   display:flex;
@@ -932,12 +991,19 @@ header #typing{
   width:55%;
   height:100%;
   transform:skewX(-20deg);
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,.24),transparent);
+  background:linear-gradient(
+    90deg,
+    transparent,
+    rgba(255,255,255,.24),
+    transparent
+  );
   animation:shine 3.5s infinite;
 }
 
 
-/* CALL */
+/* =========================
+   CALL
+========================= */
 
 .call{
   position:fixed;
@@ -1061,7 +1127,9 @@ header #typing{
 }
 
 
-/* MOBILE */
+/* =========================
+   MOBILE
+========================= */
 
 @media(max-width:700px){
 
@@ -1257,7 +1325,9 @@ header #typing{
 }
 
 
-/* SMALL PHONES */
+/* =========================
+   SMALL PHONES
+========================= */
 
 @media(max-width:380px){
 
@@ -1280,6 +1350,39 @@ header #typing{
   .call-buttons button{
     width:33px;
     height:33px;
+  }
+
+}
+
+
+/* =========================
+   TOUCH DEVICES
+========================= */
+
+@media(hover:none){
+
+  .user:hover{
+    transform:none;
+  }
+
+  .call-buttons button:hover,
+  .attach:hover,
+  #logoutBtn:hover{
+    box-shadow:none;
+  }
+
+}
+
+
+/* =========================
+   SAFE AREA
+========================= */
+
+@supports(padding:max(0px)){
+
+  #composer{
+    padding-left:max(8px,env(safe-area-inset-left));
+    padding-right:max(8px,env(safe-area-inset-right));
   }
 
 }

@@ -11,7 +11,9 @@
 <body>
 
 <div class="bg-effects">
-  <span></span><span></span><span></span>
+  <span></span>
+  <span></span>
+  <span></span>
 </div>
 
 <!-- AUTH -->
@@ -26,7 +28,9 @@
     </div>
 
     <div class="premium-label">
-      <span></span> PRIVATE MESSAGING <span></span>
+      <span></span>
+      PRIVATE MESSAGING
+      <span></span>
     </div>
 
     <h1>MATRYX <strong>CHAT</strong></h1>
@@ -46,6 +50,7 @@
 
     <div class="input-wrap">
       <span class="input-icon">🔐</span>
+
       <input
         id="password"
         type="password"
@@ -53,6 +58,7 @@
         placeholder="Password"
         maxlength="100"
       >
+
       <button
         type="button"
         class="password-toggle"
@@ -62,14 +68,22 @@
     </div>
 
     <div class="row">
-      <button class="primary-btn" onclick="auth('login')">
+
+      <button
+        class="primary-btn"
+        onclick="auth('login')"
+      >
         <span>LOGIN</span>
         <i></i>
       </button>
 
-      <button class="ghost" onclick="auth('register')">
+      <button
+        class="ghost"
+        onclick="auth('register')"
+      >
         REGISTER
       </button>
+
     </div>
 
     <small id="authMsg"></small>
@@ -92,28 +106,43 @@
     <div class="sidebar-top">
 
       <div class="brand">
+
         <div class="mini-logo">M</div>
+
         <div>
           <b>MATRYX</b>
           <small>CHAT</small>
         </div>
+
       </div>
 
       <div class="brand-status">
-        <span></span> LIVE
+        <span></span>
+        LIVE
       </div>
 
     </div>
 
+
+    <!-- PROFILE -->
     <div class="profile-card">
 
-      <div class="avatar" id="myAvatar">M</div>
+      <div
+        class="avatar"
+        id="myAvatar"
+      >
+        M
+      </div>
 
       <div class="profile-info">
+
         <b id="me">@user</b>
+
         <small>
-          <span></span> Active now
+          <span></span>
+          Active now
         </small>
+
       </div>
 
       <button
@@ -121,25 +150,38 @@
         type="button"
         onclick="logout()"
         title="Logout"
-      >⎋</button>
+      >
+        ⎋
+      </button>
 
     </div>
 
+
+    <!-- SEARCH -->
     <div class="search-wrap">
+
       <span>⌕</span>
+
       <input
         id="search"
         placeholder="Search users..."
         oninput="renderUsers()"
       >
+
     </div>
 
+
+    <!-- CONTACTS -->
     <div class="section-title">
+
       <span>CONTACTS</span>
+
       <small id="contactCount"></small>
+
     </div>
 
     <div id="users"></div>
+
 
     <div class="sidebar-footer">
       <span class="pulse"></span>
@@ -149,25 +191,37 @@
   </aside>
 
 
-  <!-- CHAT -->
+  <!-- MAIN CHAT -->
   <main>
 
+    <!-- HEADER -->
     <header>
 
       <div class="chat-user">
 
-        <div class="chat-avatar" id="chatAvatar">
+        <div
+          class="chat-avatar"
+          id="chatAvatar"
+        >
           M
         </div>
 
         <div>
-          <b id="chatName">Select a user</b>
+
+          <b id="chatName">
+            Select a user
+          </b>
+
           <span id="status"></span>
+
           <span id="typing"></span>
+
         </div>
 
       </div>
 
+
+      <!-- CALL BUTTONS -->
       <div class="call-buttons">
 
         <button
@@ -191,13 +245,18 @@
     </header>
 
 
+    <!-- MESSAGES -->
     <section id="messages">
 
       <div class="empty-chat">
 
-        <div class="empty-logo">M</div>
+        <div class="empty-logo">
+          M
+        </div>
 
-        <h2>MATRYX CHAT</h2>
+        <h2>
+          MATRYX CHAT
+        </h2>
 
         <p>
           Select a contact to start a private conversation
@@ -208,12 +267,17 @@
     </section>
 
 
+    <!-- TYPING -->
     <div id="typing"></div>
 
 
+    <!-- MESSAGE COMPOSER -->
     <form id="composer">
 
-      <label class="attach" title="Attach file">
+      <label
+        class="attach"
+        title="Attach file"
+      >
 
         <span>＋</span>
 
@@ -226,6 +290,7 @@
 
       </label>
 
+
       <div class="message-input">
 
         <input
@@ -236,12 +301,16 @@
 
       </div>
 
+
       <button
         class="send-btn"
         type="submit"
       >
+
         <span>SEND</span>
+
         <b>➤</b>
+
       </button>
 
     </form>
@@ -252,19 +321,32 @@
 
 
 <!-- CALL SCREEN -->
-<div id="call" class="call hidden">
+<div
+  id="call"
+  class="call hidden"
+>
 
   <div class="callbar">
 
     <div>
-      <small>MATRYX CALL</small>
-      <b id="callTitle">Call</b>
+
+      <small>
+        MATRYX CALL
+      </small>
+
+      <b id="callTitle">
+        Call
+      </b>
+
     </div>
+
 
     <button
       type="button"
       onclick="endCall()"
-    >✕</button>
+    >
+      ✕
+    </button>
 
   </div>
 
@@ -279,11 +361,16 @@
         playsinline
       ></video>
 
+
       <div class="remote-placeholder">
 
-        <div class="call-avatar">M</div>
+        <div class="call-avatar">
+          M
+        </div>
 
-        <span>Connecting...</span>
+        <span>
+          Connecting...
+        </span>
 
       </div>
 
@@ -323,29 +410,42 @@
 </div>
 
 
+<!-- SOCKET.IO -->
 <script src="/socket.io/socket.io.js"></script>
+
+<!-- APP JS -->
 <script src="app.js"></script>
+
 
 <script>
 
-/* PASSWORD VISIBILITY */
+/* =========================
+   PASSWORD VISIBILITY
+========================= */
 
 function togglePassword(){
 
-  const input = document.getElementById("password");
+  const input =
+    document.getElementById("password");
 
   if(!input) return;
 
   if(input.type === "password"){
+
     input.type = "text";
+
   }else{
+
     input.type = "password";
+
   }
 
 }
 
 
-/* MY AVATAR */
+/* =========================
+   MY AVATAR
+========================= */
 
 function updateMyAvatar(){
 
@@ -370,7 +470,10 @@ function updateMyAvatar(){
         document.getElementById("myAvatar");
 
       if(avatar){
-        avatar.textContent = letter;
+
+        avatar.textContent =
+          letter;
+
       }
 
     }
@@ -380,7 +483,9 @@ function updateMyAvatar(){
 }
 
 
-/* CHAT AVATAR */
+/* =========================
+   CHAT AVATAR
+========================= */
 
 function updateChatAvatar(){
 
@@ -407,53 +512,72 @@ function updateChatAvatar(){
 }
 
 
-/* ENTER KEY LOGIN */
+/* =========================
+   ENTER KEY LOGIN
+========================= */
 
-document.addEventListener("DOMContentLoaded",()=>{
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
 
-  const phone =
-    document.getElementById("phone");
+    const phone =
+      document.getElementById("phone");
 
-  const password =
-    document.getElementById("password");
+    const password =
+      document.getElementById("password");
 
-  function enterLogin(e){
 
-    if(e.key === "Enter"){
+    function enterLogin(e){
 
-      e.preventDefault();
+      if(e.key === "Enter"){
 
-      if(
-        phone &&
-        password &&
-        phone.value.trim() &&
-        password.value
-      ){
+        e.preventDefault();
 
-        auth("login");
+        if(
+          phone &&
+          password &&
+          phone.value.trim() &&
+          password.value
+        ){
+
+          auth("login");
+
+        }
 
       }
 
     }
 
+
+    if(phone){
+
+      phone.addEventListener(
+        "keydown",
+        enterLogin
+      );
+
+    }
+
+
+    if(password){
+
+      password.addEventListener(
+        "keydown",
+        enterLogin
+      );
+
+    }
+
+
+    updateMyAvatar();
+
   }
-
-  if(phone){
-    phone.addEventListener("keydown",enterLogin);
-  }
-
-  if(password){
-    password.addEventListener("keydown",enterLogin);
-  }
-
-  updateMyAvatar();
-
-});
+);
 
 
-/*
-  Keep avatar updated after selecting a contact.
-*/
+/* =========================
+   CHAT AVATAR SYNC
+========================= */
 
 const originalSelectUser =
   window.selectUser;
