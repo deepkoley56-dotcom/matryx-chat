@@ -3,9 +3,24 @@ const http = require("http");
 const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
+const { v2: cloudinary } = require("cloudinary");
 const crypto = require("crypto");
 const { Pool } = require("pg");
 const { Server } = require("socket.io");
+/* =========================================================
+   CLOUDINARY
+========================================================= */
+
+cloudinary.config({
+  cloud_name:
+    process.env.CLOUDINARY_CLOUD_NAME,
+
+  api_key:
+    process.env.CLOUDINARY_API_KEY,
+
+  api_secret:
+    process.env.CLOUDINARY_API_SECRET
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -819,9 +834,7 @@ app.post(
 
         if (req.file) {
           try {
-            fs.unlinkSync(
-              req.file.path
-            );
+            fs.unlinkSync(req.file.path);
           } catch {}
         }
 
@@ -844,15 +857,11 @@ app.post(
       }
 
       if (
-        !req.file.mimetype.startsWith(
-          "image/"
-        )
+        !req.file.mimetype.startsWith("image/")
       ) {
 
         try {
-          fs.unlinkSync(
-            req.file.path
-          );
+          fs.unlinkSync(req.file.path);
         } catch {}
 
         return res
@@ -864,16 +873,12 @@ app.post(
       }
 
       const user =
-        await findUserById(
-          id
-        );
+        await findUserById(id);
 
       if (!user) {
 
         try {
-          fs.unlinkSync(
-            req.file.path
-          );
+          fs.unlinkSync(req.file.path);
         } catch {}
 
         return res
@@ -884,9 +889,24 @@ app.post(
           });
       }
 
+      const cloudinaryResult =
+        await cloudinary.uploader.upload(
+          req.file.path,
+          {
+            folder:
+              "matryx-chat/avatars",
+
+            resource_type:
+              "image"
+          }
+        );
+
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {}
+
       const avatarUrl =
-        "/uploads/" +
-        req.file.filename;
+        cloudinaryResult.secure_url;
 
       await query(
         `
@@ -901,9 +921,7 @@ app.post(
       );
 
       const updated =
-        await findUserById(
-          id
-        );
+        await findUserById(id);
 
       const safe =
         safeUser(updated);
@@ -918,6 +936,7 @@ app.post(
       return res.json({
         avatar:
           avatarUrl,
+
         user:
           safe
       });
@@ -931,9 +950,7 @@ app.post(
 
       if (req.file) {
         try {
-          fs.unlinkSync(
-            req.file.path
-          );
+          fs.unlinkSync(req.file.path);
         } catch {}
       }
 
