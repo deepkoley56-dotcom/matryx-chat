@@ -1,4 +1,5 @@
 <!doctype html>
+
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -6,585 +7,535 @@
 <meta name="theme-color" content="#070707">
 <title>MATRYX CHAT</title>
 <link rel="stylesheet" href="style.css">
-</head>
-
-<body>
-
-<div class="bg-effects">
+</head><body><div class="bg-effects">
   <span></span><span></span><span></span>
+</div><!-- ================= AUTH ================= --><div id="auth" class="screen">  <div class="auth-glow"></div>  <div class="card auth-card"><div class="brand-mark">
+  <div class="logo">M</div>
+  <div class="logo-ring"></div>
 </div>
 
-<!-- =========================
-     AUTH
-========================= -->
+<div class="premium-label">
+  <span></span> PRIVATE MESSAGING <span></span>
+</div>
 
-<div id="auth" class="screen">
-  <div class="auth-glow"></div>
+<h1>MATRYX <strong>CHAT</strong></h1>
+<p class="auth-subtitle">Fast. Private. Real-time.</p>
 
-  <div class="card auth-card">
+<div class="input-wrap">
+  <span class="input-icon">📱</span>
 
-    <div class="brand-mark">
-      <img
-        src="/matryx-m-logo.png"
-        class="main-logo-img"
-        alt="MATRYX"
-      >
-      <div class="logo-ring"></div>
-    </div>
+  <input
+    id="phone"
+    type="tel"
+    inputmode="numeric"
+    autocomplete="tel"
+    placeholder="Phone number"
+    maxlength="15"
+  >
+</div>
 
-    <div class="premium-label">
-      <span></span>
-      PRIVATE MESSAGING
-      <span></span>
-    </div>
+<div class="input-wrap">
 
-    <h1>MATRYX <strong>CHAT</strong></h1>
-    <p class="auth-subtitle">Fast. Private. Real-time.</p>
+  <span class="input-icon">🔐</span>
 
-    <div class="input-wrap">
-      <span class="input-icon">📱</span>
+  <input
+    id="password"
+    type="password"
+    autocomplete="current-password"
+    placeholder="Password"
+    maxlength="100"
+  >
 
-      <input
-        id="phone"
-        type="tel"
-        inputmode="numeric"
-        autocomplete="tel"
-        placeholder="Phone number"
-        maxlength="15"
-      >
-    </div>
+  <button
+    type="button"
+    class="password-toggle"
+    onclick="togglePassword()"
+    aria-label="Show password"
+  >👁</button>
 
-    <div class="input-wrap">
-      <span class="input-icon">🔐</span>
+</div>
 
-      <input
-        id="password"
-        type="password"
-        autocomplete="current-password"
-        placeholder="Password"
-        maxlength="100"
-      >
+<div class="row">
 
-      <button
-        type="button"
-        class="password-toggle"
-        onclick="togglePassword()"
-        aria-label="Show password"
-      >👁</button>
-    </div>
+  <button
+    class="primary-btn"
+    onclick="auth('login')"
+  >
+    <span>LOGIN</span>
+    <i></i>
+  </button>
 
-    <div class="row">
+  <button
+    class="ghost"
+    onclick="auth('register')"
+  >
+    REGISTER
+  </button>
 
-      <button
-        class="primary-btn"
-        onclick="auth('login')"
-      >
-        <span>LOGIN</span>
-        <i></i>
-      </button>
+</div>
 
-      <button
-        class="ghost"
-        onclick="auth('register')"
-      >
-        REGISTER
-      </button>
+<small id="authMsg"></small>
 
-    </div>
+<div class="auth-footer">
+  <span class="secure-dot"></span>
+  MATRYX PRIVATE NETWORK
+</div>
 
-    <small id="authMsg"></small>
+  </div></div><!-- ================= APP ================= --><div id="app" class="hidden">  <!-- SIDEBAR -->  <aside><div class="sidebar-top">
 
-    <div class="auth-footer">
-      <span class="secure-dot"></span>
-      MATRYX PRIVATE NETWORK
+  <div class="brand">
+
+    <div class="mini-logo">M</div>
+
+    <div>
+      <b>MATRYX</b>
+      <small>CHAT</small>
     </div>
 
   </div>
-</div>
 
-
-<!-- =========================
-     APP
-========================= -->
-
-<div id="app" class="hidden">
-
-  <!-- =========================
-       SIDEBAR
-  ========================= -->
-
-  <aside>
-
-    <div class="sidebar-top">
-
-      <div class="brand">
-
-        <div class="mini-logo">
-          <img
-            src="/matryx-m-logo.png"
-            alt="M"
-          >
-        </div>
-
-        <div>
-          <b>MATRYX</b>
-          <small>CHAT</small>
-        </div>
-
-      </div>
-
-      <div class="brand-status">
-        <span></span>
-        LIVE
-      </div>
-
-    </div>
-
-
-    <!-- PROFILE -->
-
-    <div class="profile-card">
-
-      <div class="avatar-wrap">
-
-        <div
-          class="avatar"
-          id="myAvatar"
-        >
-          M
-        </div>
-
-        <img
-          id="myAvatarImage"
-          class="avatar-image hidden"
-          alt="Profile"
-        >
-
-      </div>
-
-      <div class="profile-info">
-
-        <b id="me">@user</b>
-
-        <small>
-          <span></span>
-          Active now
-        </small>
-
-      </div>
-
-      <button
-        id="editProfileBtn"
-        type="button"
-        title="Edit Profile"
-        onclick="openProfileEditor()"
-      >
-        ✎
-      </button>
-
-      <button
-        id="logoutBtn"
-        type="button"
-        onclick="logout()"
-        title="Logout"
-      >
-        ⎋
-      </button>
-
-    </div>
-
-
-    <!-- SEARCH -->
-
-    <div class="search-wrap">
-
-      <span>⌕</span>
-
-      <input
-        id="search"
-        placeholder="Search users..."
-        oninput="renderUsers()"
-      >
-
-    </div>
-
-
-    <!-- CONTACTS -->
-
-    <div class="section-title">
-
-      <span>CONTACTS</span>
-
-      <small id="contactCount"></small>
-
-    </div>
-
-    <div id="users"></div>
-
-
-    <div class="sidebar-footer">
-
-      <span class="pulse"></span>
-
-      MATRYX CHAT • SECURE
-
-    </div>
-
-  </aside>
-
-
-  <!-- =========================
-       MAIN CHAT
-  ========================= -->
-
-  <main>
-
-    <header>
-
-      <div class="chat-user">
-
-        <div
-          class="chat-avatar"
-          id="chatAvatar"
-        >
-          M
-        </div>
-
-        <img
-          id="chatAvatarImage"
-          class="chat-avatar-image hidden"
-          alt="User"
-        >
-
-        <div>
-
-          <b id="chatName">
-            Select a user
-          </b>
-
-          <span id="status"></span>
-
-          <span id="typing"></span>
-
-        </div>
-
-      </div>
-
-
-      <!-- CALL BUTTONS -->
-
-      <div class="call-buttons">
-
-        <button
-          onclick="startCall(false)"
-          title="Voice call"
-          type="button"
-        >
-          <span>☎</span>
-        </button>
-
-        <button
-          onclick="startCall(true)"
-          title="Video call"
-          type="button"
-        >
-          <span>▣</span>
-        </button>
-
-      </div>
-
-    </header>
-
-
-    <!-- MESSAGES -->
-
-    <section id="messages">
-
-      <div class="empty-chat">
-
-        <h2>MATRYX CHAT</h2>
-
-        <p>
-          Select a contact to start a private conversation
-        </p>
-
-      </div>
-
-    </section>
-
-    <div id="typing"></div>
-
-
-    <!-- COMPOSER -->
-
-    <form id="composer">
-
-      <label
-        class="attach"
-        title="Attach file"
-      >
-
-        <span>＋</span>
-
-        <input
-          id="file"
-          type="file"
-          accept="image/*,video/*,.pdf,.txt,.zip"
-          hidden
-        >
-
-      </label>
-
-
-      <div class="message-input">
-
-        <input
-          id="text"
-          autocomplete="off"
-          placeholder="Write a message..."
-        >
-
-      </div>
-
-
-      <button
-        class="send-btn"
-        type="submit"
-      >
-
-        <span>SEND</span>
-        <b>➤</b>
-
-      </button>
-
-    </form>
-
-  </main>
+  <div class="brand-status">
+    <span></span> LIVE
+  </div>
 
 </div>
 
 
-<!-- =========================
-     PROFILE EDITOR
-========================= -->
+<!-- PROFILE CARD -->
 
-<div
-  id="profileModal"
-  class="profile-modal hidden"
->
+<div class="profile-card">
 
   <div
-    class="profile-overlay"
-    onclick="closeProfileEditor()"
-  ></div>
+    class="avatar"
+    id="myAvatar"
+  >
+    M
+  </div>
 
-  <div class="profile-editor">
+  <div class="profile-info">
 
-    <div class="profile-editor-header">
+    <b id="me">@user</b>
 
-      <div>
-
-        <small>MATRYX ACCOUNT</small>
-
-        <h2>Edit Profile</h2>
-
-      </div>
-
-      <button
-        type="button"
-        onclick="closeProfileEditor()"
-        aria-label="Close"
-      >
-        ✕
-      </button>
-
-    </div>
-
-
-    <div class="profile-preview">
-
-      <div class="profile-photo-wrap">
-
-        <div
-          id="profilePreviewLetter"
-          class="profile-preview-letter"
-        >
-          M
-        </div>
-
-        <img
-          id="profilePreviewImage"
-          class="profile-preview-image hidden"
-          alt="Profile preview"
-        >
-
-      </div>
-
-      <label class="photo-btn">
-
-        <span>＋</span>
-        Change Photo
-
-        <input
-          id="profilePhoto"
-          type="file"
-          accept="image/*"
-          hidden
-        >
-
-      </label>
-
-    </div>
-
-
-    <div class="profile-field">
-
-      <label for="profileUsername">
-        YOUR NAME
-      </label>
-
-      <input
-        id="profileUsername"
-        type="text"
-        maxlength="30"
-        autocomplete="nickname"
-        placeholder="Enter your name"
-      >
-
-    </div>
-
-
-    <small
-      id="profileMsg"
-      class="profile-msg"
-    ></small>
-
-
-    <div class="profile-actions">
-
-      <button
-        type="button"
-        class="profile-cancel"
-        onclick="closeProfileEditor()"
-      >
-        CANCEL
-      </button>
-
-      <button
-        type="button"
-        class="profile-save"
-        onclick="saveProfile()"
-      >
-        <span>SAVE PROFILE</span>
-        <i></i>
-      </button>
-
-    </div>
+    <small>
+      <span></span>
+      Active now
+    </small>
 
   </div>
+
+  <!-- EDIT PROFILE -->
+
+  <button
+    id="editProfileBtn"
+    type="button"
+    onclick="openEditProfile()"
+    title="Edit Profile"
+    aria-label="Edit Profile"
+  >
+    ✎
+  </button>
+
+  <!-- LOGOUT -->
+
+  <button
+    id="logoutBtn"
+    type="button"
+    onclick="logout()"
+    title="Logout"
+  >
+    ⎋
+  </button>
 
 </div>
 
 
-<!-- =========================
-     CALL SCREEN
-========================= -->
+<!-- SEARCH -->
 
-<div
-  id="call"
-  class="call hidden"
->
+<div class="search-wrap">
 
-  <div class="callbar">
+  <span>⌕</span>
+
+  <input
+    id="search"
+    placeholder="Search users..."
+    oninput="renderUsers()"
+  >
+
+</div>
+
+
+<div class="section-title">
+
+  <span>CONTACTS</span>
+
+  <small id="contactCount"></small>
+
+</div>
+
+
+<div id="users"></div>
+
+
+<div class="sidebar-footer">
+
+  <span class="pulse"></span>
+  MATRYX CHAT • SECURE
+
+</div>
+
+  </aside>  <!-- ================= CHAT ================= -->  <main><header>
+
+  <div class="chat-user">
+
+    <div
+      class="chat-avatar"
+      id="chatAvatar"
+    >
+      M
+    </div>
 
     <div>
 
-      <small>MATRYX CALL</small>
-
-      <b id="callTitle">
-        Call
+      <b id="chatName">
+        Select a user
       </b>
 
-    </div>
+      <span id="status"></span>
 
-    <button
-      type="button"
-      onclick="endCall()"
-    >
-      ✕
-    </button>
+      <span id="typing"></span>
+
+    </div>
 
   </div>
 
 
-  <div class="videos">
+  <div class="call-buttons">
 
-    <div class="remote-wrap">
+    <button
+      onclick="startCall(false)"
+      title="Voice call"
+      type="button"
+    >
+      <span>☎</span>
+    </button>
 
-      <video
-        id="remoteVideo"
-        autoplay
-        playsinline
-      ></video>
+    <button
+      onclick="startCall(true)"
+      title="Video call"
+      type="button"
+    >
+      <span>▣</span>
+    </button>
 
-      <div class="remote-placeholder">
+  </div>
 
-        <div class="call-avatar">
-          M
-        </div>
+</header>
 
-        <span>
-          Connecting...
-        </span>
 
-      </div>
+<!-- MESSAGES -->
 
+<section id="messages">
+
+  <div class="empty-chat">
+
+    <div class="empty-logo">
+      M
     </div>
 
+    <h2>
+      MATRYX CHAT
+    </h2>
 
-    <video
-      id="localVideo"
-      autoplay
-      muted
-      playsinline
-    ></video>
+    <p>
+      Select a contact to start a private conversation
+    </p>
+
+  </div>
+
+</section>
+
+
+<div id="typing"></div>
+
+
+<!-- COMPOSER -->
+
+<form id="composer">
+
+  <label
+    class="attach"
+    title="Attach file"
+  >
+
+    <span>＋</span>
+
+    <input
+      id="file"
+      type="file"
+      accept="image/*,video/*,.pdf,.txt,.zip"
+      hidden
+    >
+
+  </label>
+
+
+  <div class="message-input">
+
+    <input
+      id="text"
+      autocomplete="off"
+      placeholder="Write a message..."
+    >
 
   </div>
 
 
-  <div class="call-actions">
+  <button
+    class="send-btn"
+    type="submit"
+  >
 
-    <button
-      type="button"
-      onclick="toggleMute()"
-      title="Mute"
-    >
-      🎙
-    </button>
+    <span>SEND</span>
+    <b>➤</b>
 
-    <button
-      type="button"
-      class="end-call"
-      onclick="endCall()"
+  </button>
+
+</form>
+
+  </main></div><!-- ================= EDIT PROFILE MODAL ================= --><div
+  id="editProfileModal"
+  class="profile-modal hidden"
+>  <div
+    class="profile-modal-backdrop"
+    onclick="closeEditProfile()"
+  ></div>  <div class="profile-editor"><!-- HEADER -->
+
+<div class="profile-editor-header">
+
+  <div>
+
+    <small>MATRYX ACCOUNT</small>
+
+    <h2>
+      Edit Profile
+    </h2>
+
+  </div>
+
+  <button
+    type="button"
+    class="profile-close"
+    onclick="closeEditProfile()"
+    aria-label="Close"
+  >
+    ✕
+  </button>
+
+</div>
+
+
+<!-- PROFILE PREVIEW -->
+
+<div class="profile-preview">
+
+  <div class="profile-photo-wrap">
+
+    <div
+      id="editAvatarPreview"
+      class="profile-big-avatar"
     >
-      ● END CALL
-    </button>
+      M
+    </div>
+
+    <label
+      class="photo-change-btn"
+      title="Change profile photo"
+    >
+
+      📷
+
+      <input
+        id="avatarFile"
+        type="file"
+        accept="image/*"
+        hidden
+        onchange="previewAvatar(event)"
+      >
+
+    </label>
+
+  </div>
+
+  <div class="profile-preview-text">
+
+    <b id="editPreviewName">
+      @user
+    </b>
+
+    <small>
+      Profile photo & name
+    </small>
 
   </div>
 
 </div>
 
 
-<!-- SOCKET.IO -->
+<!-- NAME -->
 
-<script src="/socket.io/socket.io.js"></script>
+<div class="profile-field">
 
-<!-- APP -->
+  <label for="editUsername">
+    DISPLAY NAME
+  </label>
 
-<script src="app.js"></script>
+  <div class="profile-input-wrap">
+
+    <span>👤</span>
+
+    <input
+      id="editUsername"
+      type="text"
+      maxlength="30"
+      autocomplete="off"
+      placeholder="Enter your name"
+      oninput="updateEditNamePreview()"
+    >
+
+  </div>
+
+  <small class="field-hint">
+    This name will be visible to other MATRYX CHAT users.
+  </small>
+
+</div>
 
 
-<script>
+<!-- PHONE -->
+
+<div class="profile-field">
+
+  <label>
+    PHONE NUMBER
+  </label>
+
+  <div class="profile-input-wrap disabled">
+
+    <span>📱</span>
+
+    <input
+      id="editPhone"
+      type="text"
+      readonly
+      disabled
+    >
+
+  </div>
+
+  <small class="field-hint">
+    Phone number cannot be changed here.
+  </small>
+
+</div>
+
+
+<!-- STATUS -->
+
+<small
+  id="profileMsg"
+  class="profile-message"
+></small>
+
+
+<!-- ACTIONS -->
+
+<div class="profile-editor-actions">
+
+  <button
+    type="button"
+    class="profile-cancel"
+    onclick="closeEditProfile()"
+  >
+    CANCEL
+  </button>
+
+  <button
+    type="button"
+    class="profile-save"
+    onclick="saveProfileChanges()"
+  >
+
+    <span>SAVE CHANGES</span>
+    <i></i>
+
+  </button>
+
+</div>
+
+  </div></div><!-- ================= CALL SCREEN ================= --><div id="call" class="call hidden">  <div class="callbar"><div>
+
+  <small>MATRYX CALL</small>
+
+  <b id="callTitle">
+    Call
+  </b>
+
+</div>
+
+<button
+  type="button"
+  onclick="endCall()"
+>
+  ✕
+</button>
+
+  </div>  <div class="videos"><div class="remote-wrap">
+
+  <video
+    id="remoteVideo"
+    autoplay
+    playsinline
+  ></video>
+
+  <div class="remote-placeholder">
+
+    <div class="call-avatar">
+      M
+    </div>
+
+    <span>
+      Connecting...
+    </span>
+
+  </div>
+
+</div>
+
+
+<video
+  id="localVideo"
+  autoplay
+  muted
+  playsinline
+></video>
+
+  </div>  <div class="call-actions"><button
+  type="button"
+  onclick="toggleMute()"
+  title="Mute"
+>
+  🎙
+</button>
+
+<button
+  type="button"
+  class="end-call"
+  onclick="endCall()"
+>
+  ● END CALL
+</button>
+
+  </div></div><!-- ================= SCRIPTS ================= --><script src="/socket.io/socket.io.js"></script><script src="app.js"></script><script>
 
 /* =========================
    PASSWORD VISIBILITY
@@ -626,86 +577,32 @@ function updateMyAvatar(){
     const avatar =
       document.getElementById("myAvatar");
 
-    const avatarImage =
-      document.getElementById("myAvatarImage");
+    if(!avatar) return;
 
-    if(
-      !meData ||
-      !meData.username
-    ){
 
-      if(avatar){
-        avatar.textContent = "M";
-      }
+    if(meData?.avatar){
 
-      if(avatarImage){
-        avatarImage.classList.add("hidden");
-      }
+      avatar.innerHTML =
+        `<img src="${meData.avatar}" alt="">`;
 
-      return;
-
-    }
-
-    const letter =
-      meData.username
-        .charAt(0)
-        .toUpperCase();
-
-    if(avatar){
-
-      avatar.textContent =
-        letter;
-
-    }
-
-    if(
-      avatarImage &&
-      meData.avatar
-    ){
-
-      avatarImage.src =
-        meData.avatar;
-
-      avatarImage.classList.remove(
-        "hidden"
-      );
-
-      if(avatar){
-        avatar.classList.add("hidden");
-      }
+      avatar.classList.add("has-photo");
 
     }else{
 
-      if(avatarImage){
-        avatarImage.classList.add(
-          "hidden"
-        );
-      }
+      const letter =
+        (meData?.username || "M")
+          .charAt(0)
+          .toUpperCase();
 
-      if(avatar){
-        avatar.classList.remove(
-          "hidden"
-        );
-      }
+      avatar.textContent = letter;
 
-    }
-
-    const me =
-      document.getElementById("me");
-
-    if(me){
-
-      me.textContent =
-        "@" + meData.username;
+      avatar.classList.remove("has-photo");
 
     }
 
   }catch(error){
 
-    console.error(
-      "MY AVATAR ERROR:",
-      error
-    );
+    console.error(error);
 
   }
 
@@ -724,143 +621,106 @@ function updateChatAvatar(){
   const avatar =
     document.getElementById("chatAvatar");
 
-  const avatarImage =
-    document.getElementById(
-      "chatAvatarImage"
-    );
-
   if(
-    !name ||
-    !avatar
-  ) return;
-
-
-  if(
-    !name.textContent ||
-    name.textContent === "Select a user"
+    name &&
+    avatar &&
+    name.textContent &&
+    name.textContent !== "Select a user"
   ){
 
-    avatar.textContent = "M";
-
-    if(avatarImage){
-      avatarImage.classList.add(
-        "hidden"
-      );
-    }
-
-    avatar.classList.remove(
-      "hidden"
-    );
-
-    return;
+    avatar.textContent =
+      name.textContent
+        .charAt(0)
+        .toUpperCase();
 
   }
-
-
-  avatar.textContent =
-    name.textContent
-      .charAt(0)
-      .toUpperCase();
 
 }
 
 
 /* =========================
-   PROFILE EDITOR
+   OPEN EDIT PROFILE
 ========================= */
 
-function openProfileEditor(){
+function openEditProfile(){
 
   const modal =
-    document.getElementById(
-      "profileModal"
-    );
+    document.getElementById("editProfileModal");
 
-  const input =
-    document.getElementById(
-      "profileUsername"
-    );
-
-  const previewLetter =
-    document.getElementById(
-      "profilePreviewLetter"
-    );
-
-  const previewImage =
-    document.getElementById(
-      "profilePreviewImage"
-    );
-
-  const meData =
-    JSON.parse(
-      localStorage.getItem(
-        "matryx_me"
-      ) || "null"
-    );
-
-  if(!meData){
-
-    return;
-
-  }
+  if(!modal) return;
 
 
-  if(input){
+  let meData = null;
 
-    input.value =
+  try{
+
+    meData =
+      JSON.parse(
+        localStorage.getItem("matryx_me") || "null"
+      );
+
+  }catch{}
+
+
+  if(!meData) return;
+
+
+  const usernameInput =
+    document.getElementById("editUsername");
+
+  const phoneInput =
+    document.getElementById("editPhone");
+
+  const preview =
+    document.getElementById("editAvatarPreview");
+
+  const previewName =
+    document.getElementById("editPreviewName");
+
+
+  if(usernameInput){
+
+    usernameInput.value =
       meData.username || "";
 
   }
 
 
-  if(previewLetter){
+  if(phoneInput){
 
-    previewLetter.textContent =
-      (
-        meData.username ||
-        "M"
-      )
-      .charAt(0)
-      .toUpperCase();
+    phoneInput.value =
+      meData.phone || "";
 
   }
 
 
-  if(
-    previewImage &&
-    meData.avatar
-  ){
+  if(previewName){
 
-    previewImage.src =
-      meData.avatar;
+    previewName.textContent =
+      meData.username
+        ? "@" + meData.username
+        : "@user";
 
-    previewImage.classList.remove(
-      "hidden"
-    );
+  }
 
-    if(previewLetter){
 
-      previewLetter.classList.add(
-        "hidden"
-      );
+  if(preview){
 
-    }
+    if(meData.avatar){
 
-  }else{
+      preview.innerHTML =
+        `<img src="${meData.avatar}" alt="Profile photo">`;
 
-    if(previewImage){
+      preview.classList.add("has-photo");
 
-      previewImage.classList.add(
-        "hidden"
-      );
+    }else{
 
-    }
+      preview.textContent =
+        (meData.username || "M")
+          .charAt(0)
+          .toUpperCase();
 
-    if(previewLetter){
-
-      previewLetter.classList.remove(
-        "hidden"
-      );
+      preview.classList.remove("has-photo");
 
     }
 
@@ -868,9 +728,7 @@ function openProfileEditor(){
 
 
   const msg =
-    document.getElementById(
-      "profileMsg"
-    );
+    document.getElementById("profileMsg");
 
   if(msg){
 
@@ -879,46 +737,88 @@ function openProfileEditor(){
   }
 
 
-  if(modal){
+  const avatarFile =
+    document.getElementById("avatarFile");
 
-    modal.classList.remove(
-      "hidden"
-    );
+  if(avatarFile){
+
+    avatarFile.value = "";
 
   }
 
 
-  setTimeout(()=>{
+  modal.classList.remove("hidden");
 
-    if(input){
-
-      input.focus();
-
-      input.select();
-
-    }
-
-  },100);
+  document.body.classList.add("modal-open");
 
 }
 
 
 /* =========================
-   CLOSE PROFILE
+   CLOSE EDIT PROFILE
 ========================= */
 
-function closeProfileEditor(){
+function closeEditProfile(){
 
   const modal =
-    document.getElementById(
-      "profileModal"
-    );
+    document.getElementById("editProfileModal");
 
-  if(modal){
+  if(!modal) return;
 
-    modal.classList.add(
-      "hidden"
-    );
+  modal.classList.add("hidden");
+
+  document.body.classList.remove("modal-open");
+
+}
+
+
+/* =========================
+   NAME PREVIEW
+========================= */
+
+function updateEditNamePreview(){
+
+  const input =
+    document.getElementById("editUsername");
+
+  const preview =
+    document.getElementById("editPreviewName");
+
+  const avatar =
+    document.getElementById("editAvatarPreview");
+
+
+  if(!input) return;
+
+
+  const name =
+    input.value.trim();
+
+
+  if(preview){
+
+    preview.textContent =
+      name
+        ? "@" + name
+        : "@user";
+
+  }
+
+
+  /*
+    Only change avatar letter if
+    no custom photo is currently shown.
+  */
+
+  if(
+    avatar &&
+    !avatar.classList.contains("has-photo")
+  ){
+
+    avatar.textContent =
+      (name || "M")
+        .charAt(0)
+        .toUpperCase();
 
   }
 
@@ -926,124 +826,343 @@ function closeProfileEditor(){
 
 
 /* =========================
-   PROFILE PHOTO PREVIEW
+   AVATAR PREVIEW
 ========================= */
 
-document.addEventListener(
-  "DOMContentLoaded",
-  ()=>{
+function previewAvatar(event){
 
-    const photo =
-      document.getElementById(
-        "profilePhoto"
-      );
+  const file =
+    event.target.files?.[0];
 
-    if(photo){
+  const preview =
+    document.getElementById("editAvatarPreview");
 
-      photo.addEventListener(
-        "change",
-        ()=>{
+  if(!file || !preview) return;
 
-          const file =
-            photo.files &&
-            photo.files[0];
 
-          if(!file) return;
+  if(!file.type.startsWith("image/")){
 
-          if(
-            !file.type.startsWith(
-              "image/"
-            )
-          ){
+    event.target.value = "";
 
-            return;
-
-          }
-
-          const url =
-            URL.createObjectURL(
-              file
-            );
-
-          const image =
-            document.getElementById(
-              "profilePreviewImage"
-            );
-
-          const letter =
-            document.getElementById(
-              "profilePreviewLetter"
-            );
-
-          if(image){
-
-            image.src = url;
-
-            image.classList.remove(
-              "hidden"
-            );
-
-          }
-
-          if(letter){
-
-            letter.classList.add(
-              "hidden"
-            );
-
-          }
-
-        }
-      );
-
-    }
+    return;
 
   }
-);
+
+
+  const reader =
+    new FileReader();
+
+
+  reader.onload = function(){
+
+    preview.innerHTML =
+      `<img src="${reader.result}" alt="Profile photo preview">`;
+
+    preview.classList.add("has-photo");
+
+  };
+
+
+  reader.readAsDataURL(file);
+
+}
 
 
 /* =========================
-   PROFILE NAME LIVE PREVIEW
+   SAVE PROFILE
 ========================= */
 
-document.addEventListener(
-  "DOMContentLoaded",
-  ()=>{
+async function saveProfileChanges(){
 
-    const input =
-      document.getElementById(
-        "profileUsername"
+  const usernameInput =
+    document.getElementById("editUsername");
+
+  const avatarInput =
+    document.getElementById("avatarFile");
+
+  const msg =
+    document.getElementById("profileMsg");
+
+
+  if(!usernameInput) return;
+
+
+  const username =
+    usernameInput.value.trim();
+
+
+  if(username.length < 2){
+
+    if(msg){
+
+      msg.textContent =
+        "Name must be at least 2 characters.";
+
+    }
+
+    return;
+
+  }
+
+
+  if(username.length > 30){
+
+    if(msg){
+
+      msg.textContent =
+        "Name must be 30 characters or less.";
+
+    }
+
+    return;
+
+  }
+
+
+  let meData = null;
+
+  try{
+
+    meData =
+      JSON.parse(
+        localStorage.getItem("matryx_me") || "null"
       );
 
-    const letter =
-      document.getElementById(
-        "profilePreviewLetter"
-      );
+  }catch{}
 
-    if(
-      input &&
-      letter
-    ){
 
-      input.addEventListener(
-        "input",
-        ()=>{
+  if(!meData?.id){
 
-          const value =
-            input.value.trim();
+    if(msg){
 
-          letter.textContent =
-            value
-              ? value.charAt(0).toUpperCase()
-              : "M";
+      msg.textContent =
+        "User session not found. Please login again.";
 
+    }
+
+    return;
+
+  }
+
+
+  const saveButton =
+    document.querySelector(".profile-save");
+
+
+  if(saveButton){
+
+    saveButton.disabled = true;
+
+  }
+
+
+  if(msg){
+
+    msg.textContent =
+      "Saving profile...";
+
+  }
+
+
+  try{
+
+    /*
+      First update username.
+    */
+
+    const profileResponse =
+      await fetch(
+        "/api/profile",
+        {
+          method:"PUT",
+
+          headers:{
+            "Content-Type":
+              "application/json"
+          },
+
+          body:
+            JSON.stringify({
+              id:meData.id,
+              username:username,
+              avatar:
+                meData.avatar || null
+            })
         }
+      );
+
+
+    const profileData =
+      await profileResponse.json();
+
+
+    if(!profileResponse.ok){
+
+      throw new Error(
+        profileData.error ||
+        "Profile update failed."
       );
 
     }
 
+
+    let updatedUser =
+      profileData;
+
+
+    /*
+      Upload profile photo
+      if selected.
+    */
+
+    const file =
+      avatarInput?.files?.[0];
+
+
+    if(file){
+
+      if(!file.type.startsWith("image/")){
+
+        throw new Error(
+          "Please select an image file."
+        );
+
+      }
+
+
+      const formData =
+        new FormData();
+
+      formData.append(
+        "id",
+        meData.id
+      );
+
+      formData.append(
+        "avatar",
+        file
+      );
+
+
+      const avatarResponse =
+        await fetch(
+          "/api/profile/avatar",
+          {
+            method:"POST",
+            body:formData
+          }
+        );
+
+
+      const avatarData =
+        await avatarResponse.json();
+
+
+      if(!avatarResponse.ok){
+
+        throw new Error(
+          avatarData.error ||
+          "Profile photo upload failed."
+        );
+
+      }
+
+
+      updatedUser =
+        avatarData.user ||
+        updatedUser;
+
+    }
+
+
+    /*
+      Save updated user locally.
+    */
+
+    localStorage.setItem(
+      "matryx_me",
+      JSON.stringify(updatedUser)
+    );
+
+
+    /*
+      Update visible sidebar profile.
+    */
+
+    const me =
+      document.getElementById("me");
+
+    if(me){
+
+      me.textContent =
+        "@" +
+        (updatedUser.username || "user");
+
+    }
+
+
+    updateMyAvatar();
+
+
+    if(msg){
+
+      msg.textContent =
+        "Profile updated successfully.";
+
+    }
+
+
+    setTimeout(
+      closeEditProfile,
+      700
+    );
+
+
+    /*
+      Refresh users if app.js has
+      renderUsers().
+    */
+
+    if(
+      typeof renderUsers === "function"
+    ){
+
+      try{
+
+        renderUsers();
+
+      }catch{}
+
+    }
+
+
+  }catch(error){
+
+    console.error(
+      "PROFILE SAVE ERROR:",
+      error
+    );
+
+
+    if(msg){
+
+      msg.textContent =
+        error.message ||
+        "Profile update failed.";
+
+    }
+
+  }finally{
+
+    if(saveButton){
+
+      saveButton.disabled = false;
+
+    }
+
   }
-);
+
+}
 
 
 /* =========================
@@ -1055,31 +1174,24 @@ document.addEventListener(
   ()=>{
 
     const phone =
-      document.getElementById(
-        "phone"
-      );
+      document.getElementById("phone");
 
     const password =
-      document.getElementById(
-        "password"
-      );
+      document.getElementById("password");
 
 
     function enterLogin(e){
 
-      if(e.key !== "Enter") return;
+      if(e.key === "Enter"){
 
-      e.preventDefault();
+        e.preventDefault();
 
-      if(
-        phone &&
-        password &&
-        phone.value.trim() &&
-        password.value
-      ){
 
         if(
-          typeof auth === "function"
+          phone &&
+          password &&
+          phone.value.trim() &&
+          password.value
         ){
 
           auth("login");
@@ -1118,11 +1230,31 @@ document.addEventListener(
 
 
 /* =========================
-   UPDATE AFTER USER SELECT
+   ESC CLOSE MODAL
 ========================= */
+
+document.addEventListener(
+  "keydown",
+  e => {
+
+    if(e.key === "Escape"){
+
+      closeEditProfile();
+
+    }
+
+  }
+);
+
+
+/*
+  Keep avatar updated after selecting
+  a contact.
+*/
 
 const originalSelectUser =
   window.selectUser;
+
 
 if(originalSelectUser){
 
@@ -1137,99 +1269,5 @@ if(originalSelectUser){
 
 }
 
-
-/* =========================
-   UPDATE PROFILE FROM
-   SOCKET EVENT
-========================= */
-
-if(
-  typeof io !== "undefined"
-){
-
-  try{
-
-    const profileSocket =
-      typeof socket !== "undefined"
-        ? socket
-        : null;
-
-    if(profileSocket){
-
-      profileSocket.on(
-        "profile:update",
-        user => {
-
-          try{
-
-            const meData =
-              JSON.parse(
-                localStorage.getItem(
-                  "matryx_me"
-                ) || "null"
-              );
-
-            if(
-              meData &&
-              user &&
-              meData.id === user.id
-            ){
-
-              localStorage.setItem(
-                "matryx_me",
-                JSON.stringify(user)
-              );
-
-              updateMyAvatar();
-
-            }
-
-          }catch{}
-
-        }
-      );
-
-    }
-
-  }catch{}
-
-}
-
-
-/* =========================
-   ESC CLOSE PROFILE
-========================= */
-
-document.addEventListener(
-  "keydown",
-  e => {
-
-    if(
-      e.key === "Escape"
-    ){
-
-      const modal =
-        document.getElementById(
-          "profileModal"
-        );
-
-      if(
-        modal &&
-        !modal.classList.contains(
-          "hidden"
-        )
-      ){
-
-        closeProfileEditor();
-
-      }
-
-    }
-
-  }
-);
-
-</script>
-
-</body>
+</script></body>
 </html>

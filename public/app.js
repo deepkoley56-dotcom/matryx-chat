@@ -273,33 +273,23 @@ function updateAvatarElement(
 
   if (!element) return;
 
-  /* Keep avatar box completely stable */
-  element.style.width = "";
-  element.style.height = "";
-  element.style.minWidth = "";
-  element.style.minHeight = "";
-  element.style.maxWidth = "";
-  element.style.maxHeight = "";
-  element.style.flex = "";
-
-  element.style.backgroundRepeat = "no-repeat";
-  element.style.backgroundSize = avatar
-    ? "cover"
-    : "";
-  element.style.backgroundPosition = avatar
-    ? "center"
-    : "";
-
   if (avatar) {
 
     element.style.backgroundImage =
       `url("${avatar}")`;
 
+    element.style.backgroundSize =
+      "cover";
+
+    element.style.backgroundPosition =
+      "center";
+
     element.textContent = "";
 
   } else {
 
-    element.style.backgroundImage = "";
+    element.style.backgroundImage =
+      "";
 
     element.textContent =
       String(username || "M")
@@ -307,6 +297,7 @@ function updateAvatarElement(
         .toUpperCase();
   }
 }
+
 
 /* =========================
    USERNAME EDIT
