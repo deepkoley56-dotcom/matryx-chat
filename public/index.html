@@ -33,8 +33,32 @@
     <p class="auth-subtitle">Fast. Private. Real-time.</p>
 
     <div class="input-wrap">
-      <span class="input-icon">◉</span>
-      <input id="username" placeholder="Enter username" maxlength="30" autocomplete="off">
+      <span class="input-icon">📱</span>
+      <input
+        id="phone"
+        type="tel"
+        inputmode="numeric"
+        autocomplete="tel"
+        placeholder="Phone number"
+        maxlength="15"
+      >
+    </div>
+
+    <div class="input-wrap">
+      <span class="input-icon">🔐</span>
+      <input
+        id="password"
+        type="password"
+        autocomplete="current-password"
+        placeholder="Password"
+        maxlength="100"
+      >
+      <button
+        type="button"
+        class="password-toggle"
+        onclick="togglePassword()"
+        aria-label="Show password"
+      >👁</button>
     </div>
 
     <div class="row">
@@ -82,20 +106,32 @@
     </div>
 
     <div class="profile-card">
+
       <div class="avatar" id="myAvatar">M</div>
+
       <div class="profile-info">
         <b id="me">@user</b>
-        <small><span></span> Active now</small>
+        <small>
+          <span></span> Active now
+        </small>
       </div>
 
-      <button id="logoutBtn" type="button" onclick="logout()" title="Logout">
-        ⎋
-      </button>
+      <button
+        id="logoutBtn"
+        type="button"
+        onclick="logout()"
+        title="Logout"
+      >⎋</button>
+
     </div>
 
     <div class="search-wrap">
       <span>⌕</span>
-      <input id="search" placeholder="Search users..." oninput="renderUsers()">
+      <input
+        id="search"
+        placeholder="Search users..."
+        oninput="renderUsers()"
+      >
     </div>
 
     <div class="section-title">
@@ -134,11 +170,19 @@
 
       <div class="call-buttons">
 
-        <button onclick="startCall(false)" title="Voice call">
+        <button
+          onclick="startCall(false)"
+          title="Voice call"
+          type="button"
+        >
           <span>☎</span>
         </button>
 
-        <button onclick="startCall(true)" title="Video call">
+        <button
+          onclick="startCall(true)"
+          title="Video call"
+          type="button"
+        >
           <span>▣</span>
         </button>
 
@@ -150,9 +194,15 @@
     <section id="messages">
 
       <div class="empty-chat">
+
         <div class="empty-logo">M</div>
+
         <h2>MATRYX CHAT</h2>
-        <p>Select a contact to start a private conversation.</p>
+
+        <p>
+          Select a contact to start a private conversation
+        </p>
+
       </div>
 
     </section>
@@ -164,20 +214,32 @@
     <form id="composer">
 
       <label class="attach" title="Attach file">
+
         <span>＋</span>
-        <input id="file" type="file"
-          accept="image/*,video/*,.pdf,.txt,.zip" hidden>
+
+        <input
+          id="file"
+          type="file"
+          accept="image/*,video/*,.pdf,.txt,.zip"
+          hidden
+        >
+
       </label>
 
       <div class="message-input">
+
         <input
           id="text"
           autocomplete="off"
           placeholder="Write a message..."
         >
+
       </div>
 
-      <button class="send-btn" type="submit">
+      <button
+        class="send-btn"
+        type="submit"
+      >
         <span>SEND</span>
         <b>➤</b>
       </button>
@@ -199,32 +261,60 @@
       <b id="callTitle">Call</b>
     </div>
 
-    <button onclick="endCall()">✕</button>
+    <button
+      type="button"
+      onclick="endCall()"
+    >✕</button>
 
   </div>
+
 
   <div class="videos">
 
     <div class="remote-wrap">
-      <video id="remoteVideo" autoplay playsinline></video>
+
+      <video
+        id="remoteVideo"
+        autoplay
+        playsinline
+      ></video>
 
       <div class="remote-placeholder">
+
         <div class="call-avatar">M</div>
+
         <span>Connecting...</span>
+
       </div>
+
     </div>
 
-    <video id="localVideo" autoplay muted playsinline></video>
+
+    <video
+      id="localVideo"
+      autoplay
+      muted
+      playsinline
+    ></video>
 
   </div>
 
+
   <div class="call-actions">
 
-    <button onclick="toggleMute()" title="Mute">
+    <button
+      type="button"
+      onclick="toggleMute()"
+      title="Mute"
+    >
       🎙
     </button>
 
-    <button class="end-call" onclick="endCall()">
+    <button
+      type="button"
+      class="end-call"
+      onclick="endCall()"
+    >
       ● END CALL
     </button>
 
@@ -237,33 +327,150 @@
 <script src="app.js"></script>
 
 <script>
-function updateMyAvatar(){
-  const meData = JSON.parse(localStorage.getItem("matryx_me") || "null");
-  if(meData && meData.username){
-    const letter = meData.username.charAt(0).toUpperCase();
-    const a = document.getElementById("myAvatar");
-    if(a) a.textContent = letter;
+
+/* PASSWORD VISIBILITY */
+
+function togglePassword(){
+
+  const input = document.getElementById("password");
+
+  if(!input) return;
+
+  if(input.type === "password"){
+    input.type = "text";
+  }else{
+    input.type = "password";
   }
+
 }
+
+
+/* MY AVATAR */
+
+function updateMyAvatar(){
+
+  try{
+
+    const meData =
+      JSON.parse(
+        localStorage.getItem("matryx_me") || "null"
+      );
+
+    if(
+      meData &&
+      meData.username
+    ){
+
+      const letter =
+        meData.username
+          .charAt(0)
+          .toUpperCase();
+
+      const avatar =
+        document.getElementById("myAvatar");
+
+      if(avatar){
+        avatar.textContent = letter;
+      }
+
+    }
+
+  }catch{}
+
+}
+
+
+/* CHAT AVATAR */
 
 function updateChatAvatar(){
-  const name = document.getElementById("chatName");
-  const avatar = document.getElementById("chatAvatar");
 
-  if(name && avatar && name.textContent && name.textContent !== "Select a user"){
-    avatar.textContent = name.textContent.charAt(0).toUpperCase();
+  const name =
+    document.getElementById("chatName");
+
+  const avatar =
+    document.getElementById("chatAvatar");
+
+  if(
+    name &&
+    avatar &&
+    name.textContent &&
+    name.textContent !== "Select a user"
+  ){
+
+    avatar.textContent =
+      name.textContent
+        .charAt(0)
+        .toUpperCase();
+
   }
+
 }
 
-const oldSelectUser = window.selectUser;
-if(oldSelectUser){
-  window.selectUser = async function(u){
-    await oldSelectUser(u);
-    updateChatAvatar();
-  };
+
+/* ENTER KEY LOGIN */
+
+document.addEventListener("DOMContentLoaded",()=>{
+
+  const phone =
+    document.getElementById("phone");
+
+  const password =
+    document.getElementById("password");
+
+  function enterLogin(e){
+
+    if(e.key === "Enter"){
+
+      e.preventDefault();
+
+      if(
+        phone &&
+        password &&
+        phone.value.trim() &&
+        password.value
+      ){
+
+        auth("login");
+
+      }
+
+    }
+
+  }
+
+  if(phone){
+    phone.addEventListener("keydown",enterLogin);
+  }
+
+  if(password){
+    password.addEventListener("keydown",enterLogin);
+  }
+
+  updateMyAvatar();
+
+});
+
+
+/*
+  Keep avatar updated after selecting a contact.
+*/
+
+const originalSelectUser =
+  window.selectUser;
+
+if(originalSelectUser){
+
+  window.selectUser =
+    async function(u){
+
+      await originalSelectUser(u);
+
+      updateChatAvatar();
+
+    };
+
 }
 
-updateMyAvatar();
 </script>
 
 </body>
