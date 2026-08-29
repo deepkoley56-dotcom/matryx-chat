@@ -269,11 +269,13 @@ function updateProfileUI() {
 
   if (!me) return;
 
-  if (meEl) {
-    meEl.textContent =
-      "@" + me.username;
-  }
-
+if (meEl) {
+  meEl.innerHTML =
+    "@" + escapeHtml(me.username) +
+    (isMatryxUser(me)
+      ? verifiedBadge()
+      : "");
+}
   updateAvatarElement(
     myAvatar,
     me.username,
@@ -789,12 +791,17 @@ function updateSelectedUser() {
     return;
   }
 
-  if (chatName) {
-    chatName.textContent =
+if (chatName) {
+  chatName.innerHTML =
+    escapeHtml(
       selectedUser.username ||
-      "User";
-  }
+      "Select a user"
+    ) +
+    (isMatryxUser(selectedUser)
+      ? verifiedBadge()
+      : "");
 
+}
   updateAvatarElement(
     chatAvatar,
     selectedUser.username,
@@ -2294,3 +2301,24 @@ document.addEventListener(
     }
   }
 );
+
+/* =========================================================
+   MATRYX VERIFIED BADGE
+   Visual UI only — database untouched
+========================================================= */
+
+function isMatryxUser(user){
+  return String(user?.username || "")
+    .trim()
+    .toLowerCase() === "matryx";
+}
+
+function verifiedBadge(){
+  return `
+    <span
+      class="matryx-verified"
+      title="Verified"
+      aria-label="Verified"
+    >✓</span>
+  `;
+}
